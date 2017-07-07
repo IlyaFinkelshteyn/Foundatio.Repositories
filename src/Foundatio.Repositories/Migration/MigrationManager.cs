@@ -32,7 +32,7 @@ namespace Foundatio.Repositories.Migrations {
         }
 
         public void AddMigrationsFromAssembly<T>() {
-            AddMigrationsFromAssembly(typeof(T).Assembly);
+            AddMigrationsFromAssembly(typeof(T).GetTypeInfo().Assembly);
         }
 
         public void AddMigration<T>() {

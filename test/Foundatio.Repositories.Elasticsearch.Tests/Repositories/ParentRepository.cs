@@ -2,6 +2,7 @@
 using Foundatio.Repositories.Elasticsearch.Tests.Repositories.Configuration;
 using Foundatio.Repositories.Elasticsearch.Tests.Repositories.Models;
 using Foundatio.Repositories.Models;
+using Foundatio.Repositories.Advanced;
 
 namespace Foundatio.Repositories.Elasticsearch.Tests.Repositories {
     public class ParentRepository : ElasticRepositoryBase<Parent> {
@@ -9,7 +10,7 @@ namespace Foundatio.Repositories.Elasticsearch.Tests.Repositories {
         }
 
         public Task<FindResults<Parent>> QueryAsync(RepositoryQueryDescriptor<Parent> query) {
-            return FindAsync(query);
+            return this.FindAsync(query);
         }
     }
 }

@@ -3,17 +3,11 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
-using Elasticsearch.Net;
 using FluentValidation;
-using Nest;
 using Foundatio.Caching;
-using Foundatio.Repositories.Elasticsearch.Extensions;
 using Foundatio.Logging;
 using Foundatio.Messaging;
-using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Repositories.Advanced;
-using Foundatio.Repositories.Elasticsearch.Configuration;
-using Foundatio.Repositories.Elasticsearch.Queries.Builders;
 using Foundatio.Repositories.Exceptions;
 using Foundatio.Repositories.Extensions;
 using Foundatio.Repositories.JsonPatch;
@@ -23,12 +17,12 @@ using Foundatio.Utility;
 using Newtonsoft.Json.Linq;
 using Foundatio.Repositories.Options;
 
-namespace Foundatio.Repositories.Elasticsearch {
-    public abstract class ElasticRepositoryBase<T> : ElasticReadOnlyRepositoryBase<T>, IAdvancedSearchableRepository<T> where T : class, IIdentity, new() {
+namespace Foundatio.Repositories.Marten {
+    public abstract class MartenRepositoryBase<T> : MartenReadOnlyRepositoryBase<T>, IAdvancedRepository<T> where T : class, IIdentity, new() {
         protected readonly IValidator<T> _validator;
         protected readonly IMessagePublisher _messagePublisher;
 
-        protected ElasticRepositoryBase(IIndexType<T> indexType, IValidator<T> validator = null) : base(indexType) {
+        protected MartenRepositoryBase(IIndexType<T> indexType, IValidator<T> validator = null) : base(indexType) {
             _validator = validator;
             _messagePublisher = indexType.Configuration.MessageBus;
             NotificationsEnabled = _messagePublisher != null;
@@ -142,7 +136,8 @@ namespace Foundatio.Repositories.Elasticsearch {
                     _logger.Error().Exception(response.OriginalException).Message(message).Property("request", response.GetRequest()).Write();
                     throw new ApplicationException(message, response.OriginalException);
                 }
-            } else if (operation is Models.JsonPatch jsonOperation) {
+            }
+            else if (operation is Models.JsonPatch jsonOperation) {
                 var request = new GetRequest(GetIndexById(id), ElasticType.Name, id.Value);
                 if (id.Routing != null)
                     request.Routing = id.Routing;
@@ -175,7 +170,8 @@ namespace Foundatio.Repositories.Elasticsearch {
                     _logger.Error().Exception(updateResponse.OriginalException).Message(message).Property("request", updateResponse.GetRequest()).Write();
                     throw new ApplicationException(message, updateResponse.OriginalException);
                 }
-            } else if (operation is PartialPatch partialOperation) {
+            }
+            else if (operation is PartialPatch partialOperation) {
                 // TODO: Figure out how to specify a pipeline here.
                 var request = new UpdateRequest<T, object>(GetIndexById(id), ElasticType.Name, id.Value) {
                     Doc = partialOperation.Document,
@@ -193,7 +189,8 @@ namespace Foundatio.Repositories.Elasticsearch {
                     _logger.Error().Exception(response.OriginalException).Message(message).Property("request", response.GetRequest()).Write();
                     throw new ApplicationException(message, response.OriginalException);
                 }
-            } else {
+            }
+            else {
                 throw new ArgumentException("Unknown operation type", nameof(operation));
             }
 
@@ -338,13 +335,15 @@ namespace Foundatio.Repositories.Elasticsearch {
 
                     try {
                         options.GetUpdatedIdsCallback()?.Invoke(updatedIds);
-                    } catch (Exception ex) {
+                    }
+                    catch (Exception ex) {
                         _logger.Error(ex, "Error calling updated ids callback.");
                     }
 
                     return true;
                 }, options.Clone()).AnyContext();
-            } else {
+            }
+            else {
                 var scriptOperation = operation as ScriptPatch;
                 var partialOperation = operation as PartialPatch;
                 if (scriptOperation == null && partialOperation == null)
@@ -372,7 +371,8 @@ namespace Foundatio.Repositories.Elasticsearch {
                     // TODO: What do we want to do about failures and timeouts?
                     affectedRecords += response.Updated + response.Noops;
                     Debug.Assert(response.Total == affectedRecords, "Unable to update all documents");
-                } else {
+                }
+                else {
                     if (!query.GetIncludes().Contains(_idField))
                         query.Include(_idField);
 
@@ -419,7 +419,8 @@ namespace Foundatio.Repositories.Elasticsearch {
 
                         try {
                             options.GetUpdatedIdsCallback()?.Invoke(updatedIds);
-                        } catch (Exception ex) {
+                        }
+                        catch (Exception ex) {
                             _logger.Error(ex, "Error calling updated ids callback.");
                         }
 
@@ -502,7 +503,8 @@ namespace Foundatio.Repositories.Elasticsearch {
                     _logger.Error().Exception(response.OriginalException).Message(message).Property("request", response.GetRequest()).Write();
                     throw new ApplicationException(message, response.OriginalException);
                 }
-            } else {
+            }
+            else {
                 var response = await _client.BulkAsync(bulk => {
                     bulk.Refresh(options.GetRefreshMode(ElasticType.DefaultConsistency));
                     foreach (var doc in docs)
@@ -657,7 +659,7 @@ namespace Foundatio.Repositories.Elasticsearch {
 
             var modifiedDocs = originalDocuments.FullOuterJoin(
                 documents, cf => cf.Id, cf => cf.Id,
-                (original, modified, id) => new { Id = id, Original = original, Modified = modified }).Select(m => new ModifiedDocument<T>( m.Modified, m.Original)).ToList();
+                (original, modified, id) => new { Id = id, Original = original, Modified = modified }).Select(m => new ModifiedDocument<T>(m.Modified, m.Original)).ToList();
 
             await InvalidateCacheAsync(modifiedDocs, options).AnyContext();
 
@@ -783,7 +785,8 @@ namespace Foundatio.Repositories.Elasticsearch {
                     var versionDoc = (IVersioned)document;
                     versionDoc.Version = response.Version;
                 }
-            } else {
+            }
+            else {
                 var bulkRequest = new BulkRequest();
                 var list = documents.Select(d => {
                     IBulkOperation o = isCreateOperation
@@ -902,7 +905,8 @@ namespace Foundatio.Repositories.Elasticsearch {
 
             if (documents.Count == 0) {
                 await PublishChangeTypeMessageAsync(changeType, null, delay).AnyContext();
-            } else if (BatchNotifications && documents.Count > 1) {
+            }
+            else if (BatchNotifications && documents.Count > 1) {
                 // TODO: This needs to support batch notifications
                 if (!SupportsSoftDeletes || changeType != ChangeType.Saved) {
                     foreach (var doc in documents.Select(d => d.Value)) {
@@ -915,7 +919,8 @@ namespace Foundatio.Repositories.Elasticsearch {
                 foreach (var doc in documents.Select(d => d.Value)) {
                     await PublishChangeTypeMessageAsync(allDeleted ? ChangeType.Removed : changeType, doc, delay).AnyContext();
                 }
-            } else {
+            }
+            else {
                 if (!SupportsSoftDeletes) {
                     foreach (var d in documents)
                         await PublishChangeTypeMessageAsync(changeType, d.Value, delay).AnyContext();

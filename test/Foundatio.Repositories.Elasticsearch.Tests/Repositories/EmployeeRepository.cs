@@ -7,6 +7,7 @@ using Foundatio.Repositories.Elasticsearch.Tests.Repositories.Configuration;
 using Foundatio.Repositories.Elasticsearch.Tests.Repositories.Models;
 using Foundatio.Repositories.Models;
 using Foundatio.Repositories.Options;
+using Foundatio.Repositories.Advanced;
 using Nest;
 
 namespace Foundatio.Repositories.Elasticsearch.Tests {
@@ -33,18 +34,18 @@ namespace Foundatio.Repositories.Elasticsearch.Tests {
         /// This allows us easily test aggregations
         /// </summary>
         public Task<CountResult> GetCountByQueryAsync(RepositoryQueryDescriptor<Employee> query) {
-            return CountAsync(query);
+            return this.CountAsync(query);
         }
 
         public Task<FindResults<Employee>> GetAllByAgeAsync(int age) {
-            return FindAsync(q => q.Age(age));
+            return this.FindAsync(q => q.Age(age));
         }
 
         /// <summary>
         /// Exposed only for testing purposes.
         /// </summary>
         public Task<FindResults<Employee>> GetByQueryAsync(RepositoryQueryDescriptor<Employee> query) {
-            return FindAsync(query);
+            return this.FindAsync(query);
         }
 
         public Task<FindResults<Employee>> GetAllByCompanyAsync(string company, CommandOptionsDescriptor<Employee> options = null) {
@@ -52,23 +53,23 @@ namespace Foundatio.Repositories.Elasticsearch.Tests {
             if (commandOptions.ShouldUseCache())
                 commandOptions.CacheKey(company);
 
-            return FindAsync(q => q.Company(company), o => commandOptions);
+            return this.FindAsync(q => q.Company(company), o => commandOptions);
         }
 
         public Task<FindResults<Employee>> GetAllByCompaniesWithFieldEqualsAsync(string[] companies) {
-            return FindAsync(q => q.FieldCondition(c => c.CompanyId, ComparisonOperator.Equals, companies));
+            return this.FindAsync(q => q.FieldCondition(c => c.CompanyId, ComparisonOperator.Equals, companies));
         }
 
         public Task<CountResult> GetCountByCompanyAsync(string company) {
-            return CountAsync(q => q.Company(company), o => o.CacheKey(company));
+            return this.CountAsync(q => q.Company(company), o => o.CacheKey(company));
         }
 
         public Task<CountResult> GetNumberOfEmployeesWithMissingCompanyName(string company) {
-            return CountAsync(q => q.Company(company).ElasticFilter(!Query<Employee>.Exists(f => f.Field(e => e.CompanyName))));
+            return this.CountAsync(q => q.Company(company).ElasticFilter(!Query<Employee>.Exists(f => f.Field(e => e.CompanyName))));
         }
 
         public Task<CountResult> GetNumberOfEmployeesWithMissingName(string company) {
-            return CountAsync(q => q.Company(company).ElasticFilter(!Query<Employee>.Exists(f => f.Field(e => e.Name))));
+            return this.CountAsync(q => q.Company(company).ElasticFilter(!Query<Employee>.Exists(f => f.Field(e => e.Name))));
         }
 
         /// <summary>

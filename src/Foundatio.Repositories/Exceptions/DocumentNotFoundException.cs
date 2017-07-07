@@ -1,7 +1,7 @@
 ﻿using System;
 
 namespace Foundatio.Repositories.Exceptions {
-    public class DocumentNotFoundException : ApplicationException {
+    public class DocumentNotFoundException : Exception {
         public DocumentNotFoundException() { }
 
         public DocumentNotFoundException(string id) {

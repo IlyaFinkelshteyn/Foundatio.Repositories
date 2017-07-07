@@ -6,6 +6,7 @@ using Foundatio.Repositories.Elasticsearch.Configuration;
 using Foundatio.Repositories.Elasticsearch.Tests.Repositories.Configuration;
 using Foundatio.Repositories.Elasticsearch.Tests.Repositories.Models;
 using Foundatio.Repositories.Models;
+using Foundatio.Repositories.Advanced;
 
 namespace Foundatio.Repositories.Elasticsearch.Tests {
     public class DailyLogEventRepository : ElasticRepositoryBase<LogEvent> {
@@ -16,19 +17,19 @@ namespace Foundatio.Repositories.Elasticsearch.Tests {
         }
 
         public Task<FindResults<LogEvent>> GetByCompanyAsync(string company) {
-            return FindAsync(q => q.Company(company));
+            return this.FindAsync(q => q.Company(company));
         }
 
         public Task<FindResults<LogEvent>> GetPartialByCompanyAsync(string company) {
-            return FindAsync(q => q.Company(company).Include(e => e.Id).Include(l => l.CreatedUtc));
+            return this.FindAsync(q => q.Company(company).Include(e => e.Id).Include(l => l.CreatedUtc));
         }
 
         public Task<FindResults<LogEvent>> GetAllByCompanyAsync(string company) {
-            return FindAsync(q => q.Company(company));
+            return this.FindAsync(q => q.Company(company));
         }
 
         public Task<CountResult> GetCountByCompanyAsync(string company) {
-            return CountAsync(q => q.Company(company), o => o.CacheKey(company));
+            return this.CountAsync(q => q.Company(company), o => o.CacheKey(company));
         }
 
         public async Task<long> IncrementValueAsync(string[] ids, int value = 1) {
