@@ -6,30 +6,30 @@ using Foundatio.Repositories.Options;
 
 namespace Foundatio.Repositories {
     public static class AggregationQueryExtensions {
-        internal const string AggregationsKey = "@AggregationsExpressionKey";
+        internal const string AggregationsExpressionKey = "@AggregationsExpressionKey";
 
-        public static T AggregationsExression<T>(this T options, string aggregations) where T : IRepositoryQuery {
-            return options.BuildOption(AggregationsKey, aggregations);
+        public static T AggregationsExpression<T>(this T options, string aggregations) where T : IRepositoryQuery {
+            return options.BuildOption(AggregationsExpressionKey, aggregations);
         }
     }
 }
 
 namespace Foundatio.Repositories.Options {
     public static class ReadAggregationQueryExtensions {
-        public static string GetAggregationsExression(this IRepositoryQuery query) {
-            return query.SafeGetOption<string>(AggregationQueryExtensions.AggregationsKey, null);
+        public static string GetAggregationsExpression(this IRepositoryQuery query) {
+            return query.SafeGetOption<string>(AggregationQueryExtensions.AggregationsExpressionKey, null);
         }
     }
 }
 
 namespace Foundatio.Repositories.Elasticsearch.Queries.Builders {
-    public class AggregationsQueryBuilder : IElasticQueryBuilder {
+    public class AggregationsExpressionQueryBuilder : IElasticQueryBuilder {
         public async Task BuildAsync<T>(QueryBuilderContext<T> ctx) where T : class, new() {
             var elasticOptions = ctx.Options.GetElasticTypeSettings();
             if (elasticOptions?.IndexType?.QueryParser == null)
                 return;
 
-            string aggregations = ctx.Source.GetAggregationsExression();
+            string aggregations = ctx.Source.GetAggregationsExpression();
             if (String.IsNullOrEmpty(aggregations))
                 return;
 

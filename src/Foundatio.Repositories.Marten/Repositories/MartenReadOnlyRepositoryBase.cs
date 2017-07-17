@@ -24,7 +24,6 @@ namespace Foundatio.Repositories.Marten {
         protected static readonly IReadOnlyCollection<T> EmptyList = new List<T>(0).AsReadOnly();
         protected readonly string _idField = null;
         protected readonly IDocumentStore _store;
-
         protected readonly ILogger _logger;
 
         private ScopedCacheClient _scopedCacheClient;
@@ -33,6 +32,7 @@ namespace Foundatio.Repositories.Marten {
             if (HasIdentity)
                 _idField = indexType.GetFieldName((T doc) => ((IIdentity)doc).Id) ?? "id";
             _store = store;
+            _store.QuerySession().Query<T>("", 1);
             SetCache(cacheClient);
             _logger = loggerFactory.CreateLogger(GetType());
         }

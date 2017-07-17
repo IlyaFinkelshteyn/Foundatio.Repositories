@@ -1,10 +1,9 @@
 ﻿using System.Threading.Tasks;
 using Foundatio.Repositories.Models;
-using Foundatio.Repositories.Options;
 using Foundatio.Repositories.Queries;
 
 namespace Foundatio.Repositories.Marten.Queries.Builders {
-    public class SoftDeletesQueryBuilder : ILinqQueryBuilder {
+    public class SoftDeletesQueryBuilder : IMartenQueryBuilder {
         private const string IsDeleted = nameof(ISupportSoftDeletes.IsDeleted);
         
         public Task BuildAsync<T>(QueryBuilderContext<T> ctx) where T : class, new() {

@@ -10,7 +10,7 @@ namespace Foundatio.Repositories.Advanced {
         Task<CountResult> CountAsync(IRepositoryQuery query, ICommandOptions options = null);
     }
 
-    public interface IAdvancedSearchableReadOnlyRepository<T> : ISearchableReadOnlyRepository<T>
+    public interface IAdvancedSearchableReadOnlyRepository<T> : IAdvancedReadOnlyRepository<T>, ISearchableReadOnlyRepository<T>
         where T : class, new() {
     }
 

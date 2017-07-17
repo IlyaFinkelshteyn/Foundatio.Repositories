@@ -12,6 +12,7 @@ using Foundatio.Repositories.Elasticsearch.Queries.Builders;
 using Foundatio.Repositories.Extensions;
 using Foundatio.Repositories.Models;
 using Foundatio.Repositories.Options;
+using Foundatio.Repositories.Queries;
 using Foundatio.Utility;
 using Nest;
 
@@ -44,7 +45,7 @@ namespace Foundatio.Repositories.Elasticsearch {
             return FindAsAsync<T>(query, options);
         }
 
-        protected ICollection<Field> DefaultExcludes { get; } = new List<Field>();
+        protected ICollection<QueryField> DefaultExcludes { get; } = new List<QueryField>();
 
         public async Task<FindResults<TResult>> FindAsAsync<TResult>(IRepositoryQuery query, ICommandOptions options = null) where TResult : class, new() {
             if (query == null)
@@ -175,7 +176,7 @@ namespace Foundatio.Repositories.Elasticsearch {
                 .MergeFrom(systemFilter?.GetQuery())
                 .FilterExpression(filter)
                 .SearchExpression(criteria)
-                .AggregationsExression(aggregations)
+                .AggregationsExpression(aggregations)
                 .SortExpression(sort);
 
             return FindAsync(search, options);
@@ -372,7 +373,7 @@ namespace Foundatio.Repositories.Elasticsearch {
             var search = ConfigureQuery(null)
                 .MergeFrom(systemFilter?.GetQuery())
                 .FilterExpression(filter)
-                .AggregationsExression(aggregations);
+                .AggregationsExpression(aggregations);
 
             return CountAsync(search, options);
         }

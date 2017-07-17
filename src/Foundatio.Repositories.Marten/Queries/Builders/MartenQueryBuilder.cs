@@ -4,24 +4,24 @@ using System.Threading.Tasks;
 using Foundatio.Repositories.Extensions;
 
 namespace Foundatio.Repositories.Marten.Queries.Builders {
-    public class LinqQueryBuilder : ILinqQueryBuilder {
-        private readonly List<ILinqQueryBuilder> _partBuilders = new List<ILinqQueryBuilder>();
+    public class MartenQueryBuilder : IMartenQueryBuilder {
+        private readonly List<IMartenQueryBuilder> _partBuilders = new List<IMartenQueryBuilder>();
 
-        public LinqQueryBuilder(bool registerDefaultBuilders = true) {
+        public MartenQueryBuilder(bool registerDefaultBuilders = true) {
             if (registerDefaultBuilders)
                 RegisterDefaults();
         }
 
-        public void Register<T>(bool replace = true) where T : ILinqQueryBuilder, new() {
+        public void Register<T>(bool replace = true) where T : IMartenQueryBuilder, new() {
             Register(new T(), replace);
         }
 
-        public void Register(params ILinqQueryBuilder[] builders) {
+        public void Register(params IMartenQueryBuilder[] builders) {
             foreach (var builder in builders)
                 Register(builder);
         }
 
-        public void Register<T>(T builder, bool replace = true) where T : ILinqQueryBuilder {
+        public void Register<T>(T builder, bool replace = true) where T : IMartenQueryBuilder {
             if (replace) {
                 int existing = _partBuilders.FindIndex(b => b.GetType() == typeof(T));
                 if (existing >= 0)
@@ -31,7 +31,7 @@ namespace Foundatio.Repositories.Marten.Queries.Builders {
             _partBuilders.Add(builder);
         }
 
-        public bool Unregister<T>() where T : ILinqQueryBuilder {
+        public bool Unregister<T>() where T : IMartenQueryBuilder {
             int existing = _partBuilders.FindIndex(b => b.GetType() == typeof(T));
             if (existing < 0)
                 return false;
@@ -45,7 +45,6 @@ namespace Foundatio.Repositories.Marten.Queries.Builders {
             Register<PagableQueryBuilder>();
             Register<FieldIncludesQueryBuilder>();
             Register(new ParentQueryBuilder(this));
-            Register(new ChildQueryBuilder(this));
             Register<IdentityQueryBuilder>();
             Register<SoftDeletesQueryBuilder>();
             Register<DateRangeQueryBuilder>();
@@ -57,7 +56,7 @@ namespace Foundatio.Repositories.Marten.Queries.Builders {
                 await builder.BuildAsync(ctx).AnyContext();
         }
 
-        private static readonly Lazy<LinqQueryBuilder> _default = new Lazy<LinqQueryBuilder>(() => new LinqQueryBuilder());
-        public static LinqQueryBuilder Default => _default.Value;
+        private static readonly Lazy<MartenQueryBuilder> _default = new Lazy<MartenQueryBuilder>(() => new MartenQueryBuilder());
+        public static MartenQueryBuilder Default => _default.Value;
     }
 }

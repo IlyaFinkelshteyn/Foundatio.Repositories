@@ -536,7 +536,7 @@ namespace Foundatio.Repositories.Elasticsearch {
             return await RemoveAllAsync(ConfigureQuery(null), options).AnyContext();
         }
 
-        protected List<Field> FieldsRequiredForRemove { get; } = new List<Field>();
+        protected List<QueryField> FieldsRequiredForRemove { get; } = new List<QueryField>();
 
         public async Task<long> RemoveAllAsync(IRepositoryQuery query, ICommandOptions options = null) {
             if (query == null)
@@ -544,7 +544,7 @@ namespace Foundatio.Repositories.Elasticsearch {
 
             options = ConfigureOptions(options);
             if (IsCacheEnabled) {
-                foreach (var field in FieldsRequiredForRemove.Union(new Field[] { _idField }))
+                foreach (var field in FieldsRequiredForRemove.Union(new QueryField[] { _idField }))
                     if (!query.GetIncludes().Contains(field))
                         query.Include(field);
 

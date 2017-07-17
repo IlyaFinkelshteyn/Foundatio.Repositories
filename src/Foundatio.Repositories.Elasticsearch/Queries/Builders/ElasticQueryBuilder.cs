@@ -47,8 +47,8 @@ namespace Foundatio.Repositories.Elasticsearch.Queries.Builders {
             Unregister<ExpressionQueryBuilder>();
             Register(new ParsedExpressionQueryBuilder(parser));
 
-            Unregister<AggregationsQueryBuilder>();
-            Register(new AggregationsQueryBuilder());
+            Unregister<AggregationsExpressionQueryBuilder>();
+            Register(new AggregationsExpressionQueryBuilder());
         }
 
         public void UseAliases(AliasMap aliasMap) {
@@ -60,7 +60,7 @@ namespace Foundatio.Repositories.Elasticsearch.Queries.Builders {
             Register<PagableQueryBuilder>();
             Register<FieldIncludesQueryBuilder>();
             Register<SortQueryBuilder>();
-            Register(new AggregationsQueryBuilder());
+            Register(new AggregationsExpressionQueryBuilder());
             Register(new ParentQueryBuilder(this));
             Register(new ChildQueryBuilder(this));
             Register<IdentityQueryBuilder>();

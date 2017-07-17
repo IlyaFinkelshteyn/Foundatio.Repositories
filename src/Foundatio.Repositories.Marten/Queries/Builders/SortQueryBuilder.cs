@@ -2,13 +2,10 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Foundatio.Parsers.ElasticQueries;
-using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Repositories.Options;
-using Nest;
 
-namespace Foundatio.Repositories.Elasticsearch.Queries.Builders {
-    public class SortQueryBuilder : IElasticQueryBuilder {
+namespace Foundatio.Repositories.Marten.Queries.Builders {
+    public class SortQueryBuilder : IMartenQueryBuilder {
         public Task BuildAsync<T>(QueryBuilderContext<T> ctx) where T : class, new() {
             var sortFields = ctx.Source.GetSorts();
             if (sortFields.Count <= 0)
