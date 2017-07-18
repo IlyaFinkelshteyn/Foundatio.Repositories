@@ -172,7 +172,7 @@ namespace Foundatio.Repositories.Elasticsearch {
         }       
 
         public Task<FindResults<T>> SearchAsync(ISystemFilter systemFilter, string filter = null, string criteria = null, string sort = null, string aggregations = null, ICommandOptions options = null) {
-            var search = ConfigureQuery(null)
+            var search = NewQuery()
                 .MergeFrom(systemFilter?.GetQuery())
                 .FilterExpression(filter)
                 .SearchExpression(criteria)
@@ -206,7 +206,7 @@ namespace Foundatio.Repositories.Elasticsearch {
             } else {
                 // we don't have the parent id so we have to do a query
                 // TODO: Ensure this is find one query is not cached.
-                var findResult = await FindOneAsync(ConfigureQuery(null).Id(id)).AnyContext();
+                var findResult = await FindOneAsync(NewQuery().Id(id)).AnyContext();
                 if (findResult != null)
                     hit = findResult.Document;
             }
@@ -370,12 +370,16 @@ namespace Foundatio.Repositories.Elasticsearch {
         }
 
         public Task<CountResult> CountBySearchAsync(ISystemFilter systemFilter, string filter = null, string aggregations = null, ICommandOptions options = null) {
-            var search = ConfigureQuery(null)
+            var search = NewQuery()
                 .MergeFrom(systemFilter?.GetQuery())
                 .FilterExpression(filter)
                 .AggregationsExpression(aggregations);
 
             return CountAsync(search, options);
+        }
+
+        protected virtual IRepositoryQuery<T> NewQuery() {
+            return new RepositoryQuery<T>();
         }
 
         protected virtual IRepositoryQuery ConfigureQuery(IRepositoryQuery query) {
@@ -446,6 +450,7 @@ namespace Foundatio.Repositories.Elasticsearch {
             if (search == null)
                 search = new SearchDescriptor<T>();
 
+            query = ConfigureQuery(query);
             search.Type(ElasticType.Name);
             var indices = GetIndexesByQuery(query);
             if (indices?.Length > 0)

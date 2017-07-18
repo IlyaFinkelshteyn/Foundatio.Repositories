@@ -222,7 +222,7 @@ namespace Foundatio.Repositories.Elasticsearch {
             }
 
             if (operation is Models.JsonPatch) {
-                await PatchAllAsync(ConfigureQuery(null).Id(ids), operation, options).AnyContext();
+                await PatchAllAsync(NewQuery().Id(ids), operation, options).AnyContext();
                 return;
             }
 
@@ -533,7 +533,7 @@ namespace Foundatio.Repositories.Elasticsearch {
             if (IsCacheEnabled)
                 await Cache.RemoveAllAsync().AnyContext();
 
-            return await RemoveAllAsync(ConfigureQuery(null), options).AnyContext();
+            return await RemoveAllAsync(NewQuery(), options).AnyContext();
         }
 
         protected List<QueryField> FieldsRequiredForRemove { get; } = new List<QueryField>();
@@ -543,7 +543,7 @@ namespace Foundatio.Repositories.Elasticsearch {
                 throw new ArgumentNullException(nameof(query));
 
             options = ConfigureOptions(options);
-            if (IsCacheEnabled) {
+            if (IsCacheEnabled && options.ShouldUseCache(true)) {
                 foreach (var field in FieldsRequiredForRemove.Union(new QueryField[] { _idField }))
                     if (!query.GetIncludes().Contains(field))
                         query.Include(field);
