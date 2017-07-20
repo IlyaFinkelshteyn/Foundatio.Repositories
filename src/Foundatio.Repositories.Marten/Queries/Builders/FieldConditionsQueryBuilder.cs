@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Collections;
 using Foundatio.Repositories.Marten.Extensions;
@@ -19,23 +18,23 @@ namespace Foundatio.Repositories.Marten.Queries.Builders {
                 switch (fieldValue.Operator) {
                     case ComparisonOperator.Equals:
                         if (fieldValue.Value is IEnumerable && !(fieldValue.Value is string))
-                            ctx.WhereClause.Append(new WhereFragment($"{field.SqlLocator} = ANY(?)", (IEnumerable<object>)fieldValue.Value));
+                            ctx.WhereFragments.Add(new WhereFragment($"{field.SqlLocator} = ANY(?)", (IEnumerable<object>)fieldValue.Value));
                         else
-                            ctx.WhereClause.Append(new WhereFragment($"{field.SqlLocator} = ?", fieldValue.Value));
+                            ctx.WhereFragments.Add(new WhereFragment($"{field.SqlLocator} = ?", fieldValue.Value));
 
                         break;
                     case ComparisonOperator.NotEquals:
                         if (fieldValue.Value is IEnumerable && !(fieldValue.Value is string))
-                            ctx.WhereClause.Append(new WhereFragment($"{field.SqlLocator} != ANY(?)", (IEnumerable<object>)fieldValue.Value));
+                            ctx.WhereFragments.Add(new WhereFragment($"{field.SqlLocator} != ANY(?)", (IEnumerable<object>)fieldValue.Value));
                         else
-                            ctx.WhereClause.Append(new WhereFragment($"{field.SqlLocator} != ?", fieldValue.Value));
+                            ctx.WhereFragments.Add(new WhereFragment($"{field.SqlLocator} != ?", fieldValue.Value));
 
                         break;
                     case ComparisonOperator.IsEmpty:
-                        ctx.WhereClause.Append(new WhereFragment($"{field.SqlLocator} is null"));
+                        ctx.WhereFragments.Add(new WhereFragment($"{field.SqlLocator} is null"));
                         break;
                     case ComparisonOperator.HasValue:
-                        ctx.WhereClause.Append(new WhereFragment($"{field.SqlLocator} is not null"));
+                        ctx.WhereFragments.Add(new WhereFragment($"{field.SqlLocator} is not null"));
                         break;
                 }
             }

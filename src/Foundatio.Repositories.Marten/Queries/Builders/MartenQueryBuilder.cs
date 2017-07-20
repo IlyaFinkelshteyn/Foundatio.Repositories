@@ -44,7 +44,6 @@ namespace Foundatio.Repositories.Marten.Queries.Builders {
         public void RegisterDefaults() {
             Register<PagableQueryBuilder>();
             Register<FieldIncludesQueryBuilder>();
-            Register(new ParentQueryBuilder(this));
             Register<IdentityQueryBuilder>();
             Register<SoftDeletesQueryBuilder>();
             Register<DateRangeQueryBuilder>();

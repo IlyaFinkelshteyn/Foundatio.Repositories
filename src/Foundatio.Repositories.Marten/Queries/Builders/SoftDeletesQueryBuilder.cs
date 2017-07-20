@@ -1,38 +1,27 @@
 ﻿using System.Threading.Tasks;
-using Foundatio.Repositories.Models;
 using Foundatio.Repositories.Queries;
+using Marten.Linq;
+using Marten.Schema;
 
 namespace Foundatio.Repositories.Marten.Queries.Builders {
     public class SoftDeletesQueryBuilder : IMartenQueryBuilder {
-        private const string IsDeleted = nameof(ISupportSoftDeletes.IsDeleted);
-        
         public Task BuildAsync<T>(QueryBuilderContext<T> ctx) where T : class, new() {
-            // dont add filter to child query system filters
-            if (ctx.Type == ContextType.Child)
+            if (ctx.Mapping.DeleteStyle != DeleteStyle.SoftDelete)
                 return Task.CompletedTask;
 
-            // get soft delete mode, use parent query as default if it exists
-            var mode = ctx.Source.GetSoftDeleteMode(ctx.Parent?.Source?.GetSoftDeleteMode() ?? SoftDeleteQueryMode.ActiveOnly);
-
-            // no filter needed if we want all
-            if (mode == SoftDeleteQueryMode.All)
-                return Task.CompletedTask;
-
-            // check to see if the model supports soft deletes
-            var options = ctx.Options.GetElasticTypeSettings();
-            if (options == null || !options.SupportsSoftDeletes)
-                return Task.CompletedTask;
+            var mode = ctx.Source.GetSoftDeleteMode();
 
             // if we are querying for specific ids then we don't need a deleted filter
             var ids = ctx.Source.GetIds();
             if (ids.Count > 0)
                 return Task.CompletedTask;
 
-            string fieldName = options.IndexType?.GetFieldName(IsDeleted) ?? IsDeleted;
+            if (mode == SoftDeleteQueryMode.All)
+                ctx.WhereFragments.Add(new WhereFragment($"d.{DocumentMapping.DeletedColumn} is not null"));
             if (mode == SoftDeleteQueryMode.ActiveOnly)
-                ctx.Filter &= new TermQuery { Field = fieldName, Value = false };
-            else if (mode == SoftDeleteQueryMode.DeletedOnly)
-                ctx.Filter &= new TermQuery { Field = fieldName, Value = true };
+                ctx.WhereFragments.Add(new WhereFragment($"d.{DocumentMapping.DeletedColumn} = False"));
+            if (mode == SoftDeleteQueryMode.DeletedOnly)
+                ctx.WhereFragments.Add(new WhereFragment($"d.{DocumentMapping.DeletedColumn} = True"));
 
             return Task.CompletedTask;
         }

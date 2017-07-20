@@ -2,16 +2,19 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using AutoMapper;
 using Foundatio.Caching;
 using Foundatio.Logging;
 using Foundatio.Repositories.Advanced;
 using Foundatio.Repositories.Extensions;
+using Foundatio.Repositories.Marten.Queries.Builders;
 using Foundatio.Repositories.Models;
 using Foundatio.Repositories.Options;
+using Foundatio.Repositories.Queries;
 using Foundatio.Utility;
 using Marten;
+using Marten.Linq;
 using Marten.Schema;
-using Marten.Services;
 
 namespace Foundatio.Repositories.Marten {
     public abstract class MartenReadOnlyRepositoryBase<T> : IAdvancedReadOnlyRepository<T> where T : class, new() {
@@ -23,51 +26,41 @@ namespace Foundatio.Repositories.Marten {
         protected static readonly string EntityTypeName = typeof(T).Name;
         protected static readonly IReadOnlyCollection<T> EmptyList = new List<T>(0).AsReadOnly();
         protected readonly string _idField = null;
-        protected readonly IDocumentStore _store;
+        protected readonly DocumentStore _store;
+        protected readonly DocumentMapping _mapping;
         protected readonly ILogger _logger;
 
         private ScopedCacheClient _scopedCacheClient;
 
         protected MartenReadOnlyRepositoryBase(IDocumentStore store, ICacheClient cacheClient, ILoggerFactory loggerFactory) {
+            _store = store as DocumentStore;
+            _mapping = _store.Storage.MappingFor(typeof(T));
             if (HasIdentity)
-                _idField = indexType.GetFieldName((T doc) => ((IIdentity)doc).Id) ?? "id";
-            _store = store;
-            _store.QuerySession().Query<T>("", 1);
+                _idField = _mapping.FieldFor(_mapping.IdMember).SqlLocator;
+
             SetCache(cacheClient);
             _logger = loggerFactory.CreateLogger(GetType());
         }
+
+        protected ICollection<QueryField> DefaultExcludes { get; } = new List<QueryField>();
 
         public Task<FindResults<T>> FindAsync(IRepositoryQuery query, ICommandOptions options = null) {
             return FindAsAsync<T>(query, options);
         }
 
-        protected ICollection<Field> DefaultExcludes { get; } = new List<Field>();
-
         public async Task<FindResults<TResult>> FindAsAsync<TResult>(IRepositoryQuery query, ICommandOptions options = null) where TResult : class, new() {
             if (query == null)
                 query = new RepositoryQuery();
 
-            bool useSnapshotPaging = options.ShouldUseSnapshotPaging();
-            // don't use caching with snapshot paging.
-            bool allowCaching = IsCacheEnabled && useSnapshotPaging == false;
+            bool allowCaching = IsCacheEnabled;
 
             options = ConfigureOptions(options);
             await OnBeforeQueryAsync(query, options, typeof(TResult)).AnyContext();
 
-            Func<FindResults<TResult>, Task<FindResults<TResult>>> getNextPageFunc = async r => {
+            async Task<FindResults<TResult>> GetNextPageFunc(FindResults<TResult> r) {
                 var previousResults = r;
                 if (previousResults == null)
                     throw new ArgumentException(nameof(r));
-
-                if (!String.IsNullOrEmpty(previousResults.GetScrollId())) {
-                    var scrollResponse = await _client.ScrollAsync<TResult>(options.GetSnapshotLifetime(), previousResults.GetScrollId()).AnyContext();
-                    _logger.Trace(() => scrollResponse.GetRequest());
-
-                    var results = scrollResponse.ToFindResults();
-                    results.Page = previousResults.Page + 1;
-                    results.HasMore = scrollResponse.Hits.Count() >= options.GetLimit();
-                    return results;
-                }
 
                 if (options == null)
                     return new FindResults<TResult>();
@@ -75,7 +68,7 @@ namespace Foundatio.Repositories.Marten {
                 options?.PageNumber(!options.HasPageNumber() ? 2 : options.GetPage() + 1);
 
                 return await FindAsAsync<TResult>(query, options).AnyContext();
-            };
+            }
 
             string cacheSuffix = options?.HasPageLimit() == true ? String.Concat(options.GetPage().ToString(), ":", options.GetLimit().ToString()) : null;
 
@@ -83,60 +76,44 @@ namespace Foundatio.Repositories.Marten {
             if (allowCaching) {
                 result = await GetCachedQueryResultAsync<FindResults<TResult>>(options, cacheSuffix: cacheSuffix).AnyContext();
                 if (result != null) {
-                    ((IGetNextPage<TResult>)result).GetNextPageFunc = async r => await getNextPageFunc(r).AnyContext();
+                    ((IGetNextPage<TResult>)result).GetNextPageFunc = async r => await GetNextPageFunc(r).AnyContext();
                     return result;
                 }
             }
 
-            ISearchResponse<TResult> response = null;
+            using (var session = _store.QuerySession()) {
+                QueryStatistics stats;
+                var response = await session.Query<T>(query, options).Stats(out stats).ToListAsync().AnyContext(); ;
+                var mappedResponse = Mapper.Map<IReadOnlyList<TResult>>(response);
 
-            if (useSnapshotPaging == false || !options.HasSnapshotScrollId()) {
-                var searchDescriptor = await CreateSearchDescriptorAsync(query, options).AnyContext();
-                if (useSnapshotPaging)
-                    searchDescriptor.Scroll(options.GetSnapshotLifetime());
+                if (options.HasPageLimit()) {
+                    result = ToFindResults<TResult>(mappedResponse, stats.TotalResults);
+                    result.HasMore = response.Count > options.GetLimit();
+                    ((IGetNextPage<TResult>)result).GetNextPageFunc = GetNextPageFunc;
+                } else {
+                    result = ToFindResults(mappedResponse, stats.TotalResults);
+                }
 
-                response = await _client.SearchAsync<TResult>(searchDescriptor).AnyContext();
-            }
-            else {
-                response = await _client.ScrollAsync<TResult>(options.GetSnapshotLifetime(), options.GetSnapshotScrollId()).AnyContext();
-            }
+                result.Page = options.GetPage();
 
-            _logger.Trace(() => response.GetRequest());
-            if (!response.IsValid) {
-                if (response.ApiCall.HttpStatusCode.GetValueOrDefault() == 404)
-                    return new FindResults<TResult>();
+                if (!allowCaching)
+                    return result;
 
-                string message = response.GetErrorMessage();
-                _logger.Error().Exception(response.OriginalException).Message(message).Property("request", response.GetRequest()).Write();
-                throw new ApplicationException(message, response.OriginalException);
-            }
+                var nextPageFunc = ((IGetNextPage<TResult>)result).GetNextPageFunc;
+                ((IGetNextPage<TResult>)result).GetNextPageFunc = null;
+                await SetCachedQueryResultAsync(options, result, cacheSuffix: cacheSuffix).AnyContext();
+                ((IGetNextPage<TResult>)result).GetNextPageFunc = nextPageFunc;
 
-            if (useSnapshotPaging) {
-                result = response.ToFindResults();
-                // TODO: Is there a better way to figure out if you are done scrolling?
-                result.HasMore = response.Hits.Count() >= options.GetLimit();
-                ((IGetNextPage<TResult>)result).GetNextPageFunc = getNextPageFunc;
-            }
-            else if (options.HasPageLimit() == true) {
-                result = response.ToFindResults(options.GetLimit());
-                result.HasMore = response.Hits.Count() > options.GetLimit();
-                ((IGetNextPage<TResult>)result).GetNextPageFunc = getNextPageFunc;
-            }
-            else {
-                result = response.ToFindResults();
-            }
-
-            result.Page = options.GetPage();
-
-            if (!allowCaching)
                 return result;
+            }
+        }
 
-            var nextPageFunc = ((IGetNextPage<TResult>)result).GetNextPageFunc;
-            ((IGetNextPage<TResult>)result).GetNextPageFunc = null;
-            await SetCachedQueryResultAsync(options, result, cacheSuffix: cacheSuffix).AnyContext();
-            ((IGetNextPage<TResult>)result).GetNextPageFunc = nextPageFunc;
+        protected FindResults<TResult> ToFindResults<TResult>(IReadOnlyList<TResult> results, long total) where TResult : class {
+            return new FindResults<TResult>(results.Select(ToFindHit), total);
+        }
 
-            return result;
+        protected FindHit<TResult> ToFindHit<TResult>(TResult doc) where TResult : class {
+            return new FindHit<TResult>(null, doc, 0);
         }
 
         public async Task<FindHit<T>> FindOneAsync(IRepositoryQuery query, ICommandOptions options = null) {
@@ -150,24 +127,16 @@ namespace Foundatio.Repositories.Marten {
             options = ConfigureOptions(options);
             await OnBeforeQueryAsync(query, options, typeof(T)).AnyContext();
 
-            var searchDescriptor = (await CreateSearchDescriptorAsync(query, options).AnyContext()).Size(1);
-            var response = await _client.SearchAsync<T>(searchDescriptor).AnyContext();
-            _logger.Trace(() => response.GetRequest());
+            using (var session = _store.QuerySession()) {
+                var response = await session.Query<T>(query, options).FirstOrDefaultAsync().AnyContext(); ;
 
-            if (!response.IsValid) {
-                if (response.ApiCall.HttpStatusCode.GetValueOrDefault() == 404)
-                    return FindHit<T>.Empty;
+                result = ToFindHit(response);
 
-                string message = response.GetErrorMessage();
-                _logger.Error().Exception(response.OriginalException).Message(message).Property("request", response.GetRequest()).Write();
-                throw new ApplicationException(message, response.OriginalException);
+                if (IsCacheEnabled)
+                    await SetCachedQueryResultAsync(options, result).AnyContext();
+
+                return result;
             }
-
-            result = response.Hits.FirstOrDefault()?.ToFindHit();
-            if (IsCacheEnabled)
-                await SetCachedQueryResultAsync(options, result).AnyContext();
-
-            return result;
         }
         
         public async Task<T> GetByIdAsync(Id id, ICommandOptions options = null) {
@@ -179,26 +148,12 @@ namespace Foundatio.Repositories.Marten {
                 hit = await Cache.GetAsync<T>(id, default(T)).AnyContext();
 
             if (hit != null) {
-                _logger.Trace(() => $"Cache hit: type={ElasticType.Name} key={id}");
+                _logger.Trace(() => $"Cache hit: type={EntityTypeName} key={id}");
                 return hit;
             }
 
-            if (!HasParent || id.Routing != null) {
-                var request = new GetRequest(GetIndexById(id), ElasticType.Name, id.Value);
-                if (id.Routing != null)
-                    request.Routing = id.Routing;
-                var response = await _client.GetAsync<T>(request).AnyContext();
-                _logger.Trace(() => response.GetRequest());
-
-                hit = response.Found ? response.ToFindHit().Document : null;
-            }
-            else {
-                // we don't have the parent id so we have to do a query
-                // TODO: Ensure this is find one query is not cached.
-                var findResult = await FindOneAsync(ConfigureQuery(null).Id(id)).AnyContext();
-                if (findResult != null)
-                    hit = findResult.Document;
-            }
+            using (var session = _store.QuerySession())
+                hit = await session.LoadAsync<T>(id.Value).AnyContext();
 
             if (hit != null && IsCacheEnabled && options.ShouldUseCache())
                 await Cache.SetAsync(id, hit, options.GetExpiresIn()).AnyContext();
@@ -224,35 +179,9 @@ namespace Foundatio.Repositories.Marten {
             if (itemsToFind.Count == 0)
                 return hits.AsReadOnly();
 
-            var multiGet = new MultiGetDescriptor();
-            foreach (var id in itemsToFind.Where(i => i.Routing != null || !HasParent)) {
-                multiGet.Get<T>(f => {
-                    f.Id(id.Value).Index(GetIndexById(id)).Type(ElasticType.Name);
-                    if (id.Routing != null)
-                        f.Routing(id.Routing);
-
-                    return f;
-                });
-            }
-
-            var multiGetResults = await _client.MultiGetAsync(multiGet).AnyContext();
-            _logger.Trace(() => multiGetResults.GetRequest());
-
-            foreach (var doc in multiGetResults.Documents) {
-                if (!doc.Found)
-                    continue;
-
-                hits.Add(((IMultiGetHit<T>)doc).ToFindHit().Document);
-                itemsToFind.Remove(doc.Id);
-            }
-
-            // fallback to doing a find
-            if (itemsToFind.Count > 0 && (HasParent || HasMultipleIndexes)) {
-                var response = await this.FindAsync(q => q.Id(itemsToFind.Select(id => id.Value)), o => o.PageLimit(1000)).AnyContext();
-                do {
-                    if (response.Hits.Count > 0)
-                        hits.AddRange(response.Hits.Where(h => h.Document != null).Select(h => h.Document));
-                } while (await response.NextPageAsync().AnyContext());
+            using (var session = _store.QuerySession()) {
+                var docs = await session.LoadManyAsync<T>(ids.Select(i => i.Value).ToArray()).AnyContext();
+                hits.AddRange(docs);
             }
 
             if (IsCacheEnabled && options.ShouldUseCache()) {
@@ -272,22 +201,8 @@ namespace Foundatio.Repositories.Marten {
                 return false;
             
             using (var session = _store.QuerySession()) {
-                session.Query<T>().Contains(id);
-            }
-            if (!HasParent || id.Routing != null) {
-                var response = await _client.DocumentExistsAsync<T>(new DocumentPath<T>(id.Value), d => {
-                    d.Index(GetIndexById(id));
-                    if (id.Routing != null)
-                        d.Routing(id.Routing);
-
-                    return d;
-                }).AnyContext();
-                _logger.Trace(() => response.GetRequest());
-
-                return response.Exists;
-            }
-            else {
-                return await this.ExistsAsync(q => q.Id(id)).AnyContext();
+                var count = await session.Query<T>().CountAsync(d => ((IIdentity)d).Id == id.Value).AnyContext();
+                return count > 0;
             }
         }
 
@@ -298,21 +213,11 @@ namespace Foundatio.Repositories.Marten {
             var options = ConfigureOptions(null);
             await OnBeforeQueryAsync(query, options, typeof(T)).AnyContext();
 
-            var searchDescriptor = (await CreateSearchDescriptorAsync(query, options).AnyContext()).Size(1);
-            searchDescriptor.DocvalueFields(_idField);
-            var response = await _client.SearchAsync<T>(searchDescriptor).AnyContext();
-            _logger.Trace(() => response.GetRequest());
+            using (var session = _store.QuerySession()) {
+                var response = await session.Query<T>(query, options).CountAsync().AnyContext();
 
-            if (!response.IsValid) {
-                if (response.ApiCall.HttpStatusCode.GetValueOrDefault() == 404)
-                    return false;
-
-                string message = response.GetErrorMessage();
-                _logger.Error().Exception(response.OriginalException).Message(message).Property("request", response.GetRequest()).Write();
-                throw new ApplicationException(message, response.OriginalException);
+                return response > 0;
             }
-
-            return response.HitsMetaData.Total > 0;
         }
 
         public async Task<CountResult> CountAsync(IRepositoryQuery query, ICommandOptions options = null) {
@@ -326,24 +231,13 @@ namespace Foundatio.Repositories.Marten {
             options = ConfigureOptions(options);
             await OnBeforeQueryAsync(query, options, typeof(T)).AnyContext();
 
-            var searchDescriptor = await CreateSearchDescriptorAsync(query, options).AnyContext();
-            searchDescriptor.Size(0);
+            using (var session = _store.QuerySession()) {
+                var response = await session.Query<T>(query, options).CountAsync().AnyContext();
 
-            var response = await _client.SearchAsync<T>(searchDescriptor).AnyContext();
-            _logger.Trace(() => response.GetRequest());
-
-            if (!response.IsValid) {
-                if (response.ApiCall.HttpStatusCode.GetValueOrDefault() == 404)
-                    return new CountResult();
-
-                string message = response.GetErrorMessage();
-                _logger.Error().Exception(response.OriginalException).Message(message).Property("request", response.GetRequest()).Write();
-                throw new ApplicationException(message, response.OriginalException);
+                result = new CountResult(response);
+                await SetCachedQueryResultAsync(options, result, "count").AnyContext();
+                return result;
             }
-
-            result = new CountResult(response.Total, response.ToAggregations());
-            await SetCachedQueryResultAsync(options, result, "count").AnyContext();
-            return result;
         }
 
         public async Task<long> CountAsync(ICommandOptions options = null) {
@@ -351,6 +245,10 @@ namespace Foundatio.Repositories.Marten {
                 var result = await session.Query<T>().CountAsync().AnyContext();
                 return result;
             }
+        }
+
+        protected virtual IRepositoryQuery<T> NewQuery() {
+            return new RepositoryQuery<T>();
         }
 
         protected virtual IRepositoryQuery ConfigureQuery(IRepositoryQuery query) {

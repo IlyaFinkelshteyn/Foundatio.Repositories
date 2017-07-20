@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Foundatio.Repositories.Elasticsearch.Tests.Repositories.Models;
+using Foundatio.Repositories.Marten.Tests.Repositories.Models;
 using Foundatio.Repositories.Extensions;
 using Foundatio.Repositories.Utility;
 using Foundatio.Utility;
@@ -10,7 +10,7 @@ using Xunit;
 using Xunit.Abstractions;
 using LogLevel = Foundatio.Logging.LogLevel;
 
-namespace Foundatio.Repositories.Elasticsearch.Tests {
+namespace Foundatio.Repositories.Marten.Tests {
     public sealed class VersionedTests : ElasticRepositoryTestBase {
         private readonly EmployeeRepository _employeeRepository;
 
@@ -130,16 +130,6 @@ namespace Foundatio.Repositories.Elasticsearch.Tests {
             Assert.Equal(4, employee2.Version);
 
             Assert.Equal(employee2, await _employeeRepository.GetByIdAsync(employee2.Id));
-        }
-
-        [Fact(Skip = "TODO: verify index many works when when getParent & getindex == null;")]
-        public void SaveCollectionWithNoIndexOrParentAsync() {
-            throw new NotImplementedException();
-        }
-
-        [Fact(Skip = "TODO: need versioning tests for parent / child docs.")]
-        public void SaveWithVersionedParentChildAsync() {
-            throw new NotImplementedException();
         }
 
         [Fact]
@@ -270,7 +260,7 @@ namespace Foundatio.Repositories.Elasticsearch.Tests {
 
             Assert.Equal(NUMBER_OF_EMPLOYEES, await _employeeRepository.CountAsync());
 
-            var results = await _employeeRepository.GetAllAsync(o => o.PageLimit(PAGE_SIZE).SnapshotPaging());
+            var results = await _employeeRepository.GetAllAsync(o => o.PageLimit(PAGE_SIZE));
             Assert.True(results.HasMore);
 
             var viewedIds = new HashSet<string>();
@@ -287,43 +277,6 @@ namespace Foundatio.Repositories.Elasticsearch.Tests {
                 pagedRecords += results.Documents.Count;
                 newEmployees.Add(await _employeeRepository.AddAsync(EmployeeGenerator.Generate(companyId: "1"), o => o.ImmediateConsistency(true)));
             } while (await results.NextPageAsync());
-
-            Assert.False(results.HasMore);
-            Assert.True(employees.All(e => viewedIds.Contains(e.Id)));
-            Assert.Equal(NUMBER_OF_EMPLOYEES, pagedRecords);
-        }
-
-        [Fact]
-        public async Task CanUseSnapshotWithScrollIdAsync() {
-            const int NUMBER_OF_EMPLOYEES = 100;
-            const int PAGE_SIZE = 10;
-
-            Log.MinimumLevel = LogLevel.Warning;
-            var employees = EmployeeGenerator.GenerateEmployees(NUMBER_OF_EMPLOYEES, companyId: "1");
-            await _employeeRepository.AddAsync(employees, o => o.ImmediateConsistency());
-            Log.MinimumLevel = LogLevel.Trace;
-
-            Assert.Equal(NUMBER_OF_EMPLOYEES, await _employeeRepository.CountAsync());
-
-            var results = await _employeeRepository.GetAllAsync(o => o.PageLimit(PAGE_SIZE).SnapshotPaging());
-            Assert.True(results.HasMore);
-
-            var viewedIds = new HashSet<string>();
-            var newEmployees = new List<Employee>();
-            int pagedRecords = 0;
-            do {
-                Assert.True(results.Documents.Count >= PAGE_SIZE);
-                Assert.Equal(NUMBER_OF_EMPLOYEES, results.Total);
-                Assert.False(results.Hits.Any(h => viewedIds.Contains(h.Id)));
-                viewedIds.AddRange(results.Hits.Select(h => h.Id));
-
-                Assert.False(newEmployees.Any(d => viewedIds.Contains(d.Id)));
-
-                pagedRecords += results.Documents.Count;
-                newEmployees.Add(await _employeeRepository.AddAsync(EmployeeGenerator.Generate(companyId: "1"), o => o.ImmediateConsistency(true)));
-
-                results = await _employeeRepository.GetAllAsync(o => o.SnapshotPagingScrollId(results));
-            } while (results != null && results.Hits.Count > 0);
 
             Assert.False(results.HasMore);
             Assert.True(employees.All(e => viewedIds.Contains(e.Id)));

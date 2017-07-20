@@ -1,5 +1,4 @@
-﻿using System;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using Foundatio.Repositories.Queries;
 using Marten.Linq;
 
@@ -10,11 +9,11 @@ namespace Foundatio.Repositories.Marten.Queries.Builders {
             var idField = ctx.Mapping.FieldFor(ctx.Mapping.IdMember);
             
             if (ids.Count > 0)
-                ctx.WhereClause.Append(new WhereFragment($"{idField.SqlLocator} = ANY(?)", ids));
+                ctx.WhereFragments.Add(new WhereFragment($"{idField.SqlLocator} = ANY(?)", ids));
 
             var excludesIds = ctx.Source.GetExcludedIds();
             if (excludesIds.Count > 0)
-                ctx.WhereClause.Append(new WhereFragment($"{idField.SqlLocator} != ANY(?)", ids));
+                ctx.WhereFragments.Add(new WhereFragment($"{idField.SqlLocator} != ANY(?)", ids));
 
             return Task.CompletedTask;
         }

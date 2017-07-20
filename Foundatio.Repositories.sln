@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.26621.2
+VisualStudioVersion = 15.0.26711.1
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Foundatio.Repositories", "src\Foundatio.Repositories\Foundatio.Repositories.csproj", "{F5B6C2B5-485F-4A4B-8E00-D5F77676CD6E}"
 EndProject
@@ -25,7 +25,11 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Foundatio.Repositories.Elas
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Foundatio.Repositories.Elasticsearch.Tests", "test\Foundatio.Repositories.Elasticsearch.Tests\Foundatio.Repositories.Elasticsearch.Tests.csproj", "{93E138E9-D06C-4B78-B62D-317786025013}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Foundatio.Repositories.Marten", "src\Foundatio.Repositories.Marten\Foundatio.Repositories.Marten.csproj", "{E87AFB50-08DE-465D-A478-619C323A786F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Foundatio.Repositories.Marten", "src\Foundatio.Repositories.Marten\Foundatio.Repositories.Marten.csproj", "{E87AFB50-08DE-465D-A478-619C323A786F}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Test", "src\Test\Test.csproj", "{3A61B1F8-1C21-4CB1-88C8-C201A8CAE445}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Foundatio.Repositories.Marten.Tests", "test\Foundatio.Repositories.Marten.Tests\Foundatio.Repositories.Marten.Tests.csproj", "{EEFD7AAF-649B-445B-8204-F2EAE4CDF71E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -53,6 +57,14 @@ Global
 		{E87AFB50-08DE-465D-A478-619C323A786F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E87AFB50-08DE-465D-A478-619C323A786F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E87AFB50-08DE-465D-A478-619C323A786F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3A61B1F8-1C21-4CB1-88C8-C201A8CAE445}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3A61B1F8-1C21-4CB1-88C8-C201A8CAE445}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3A61B1F8-1C21-4CB1-88C8-C201A8CAE445}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3A61B1F8-1C21-4CB1-88C8-C201A8CAE445}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EEFD7AAF-649B-445B-8204-F2EAE4CDF71E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EEFD7AAF-649B-445B-8204-F2EAE4CDF71E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EEFD7AAF-649B-445B-8204-F2EAE4CDF71E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EEFD7AAF-649B-445B-8204-F2EAE4CDF71E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -60,6 +72,7 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{23002BA4-8663-460B-8D67-3AA941B0322A} = {70515E66-DAF8-4D18-8F8F-8A2934171AA9}
 		{93E138E9-D06C-4B78-B62D-317786025013} = {70515E66-DAF8-4D18-8F8F-8A2934171AA9}
+		{EEFD7AAF-649B-445B-8204-F2EAE4CDF71E} = {70515E66-DAF8-4D18-8F8F-8A2934171AA9}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {7A7919B9-8C61-4168-BD1C-99E3E386DD8F}

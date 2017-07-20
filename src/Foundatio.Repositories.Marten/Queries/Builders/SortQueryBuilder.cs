@@ -14,7 +14,9 @@ namespace Foundatio.Repositories.Marten.Queries.Builders {
             //var opt = ctx.GetOptionsAs<IElasticQueryOptions>();
             //foreach (var sort in sortableQuery.SortFields.Where(s => CanSortByField(opt?.AllowedSortFields, s.Field)))
             //    ctx.Search.Sort(s => s.Field(sort.Field, sort.Order == Foundatio.Repositories.Models.SortOrder.Ascending ? SortOrder.Ascending : SortOrder.Descending));
-            ctx.Search.Sort(sortFields.Select(f => new SortField { Field = f.Field.ToNestField(), Order = f.Order.ToNestOrder() }));
+
+
+            //ctx.Search.Sort(sortFields.Select(f => new SortField { Field = f.Field.ToNestField(), Order = f.Order.ToNestOrder() }));
 
             return Task.CompletedTask;
         }
