@@ -41,16 +41,22 @@ namespace Foundatio.Repositories.Marten.Queries.Builders {
         public IDictionary<string, object> Data { get; } = new Dictionary<string, object>();
 
         public IQueryable<T> ConfigureQuery(IQueryable<T> query) {
-            return _queryModifiers.Aggregate(query, (current, modifier) => modifier(current));
+            var q = query;
+            if (WhereFragments.Count > 0)
+                q = q.Where(e => e.MatchesWhereFragment(new CompoundWhereFragment("and", WhereFragments.ToArray())));
+
+            foreach (var m in _queryModifiers)
+                q = m(q);
+
+            return q;
         }
 
         public void AddQueryModifier(Func<IQueryable<T>, IQueryable<T>> modifier) {
             _queryModifiers.Add(modifier);
         }
 
-        public void QueryAnd<TModel>(Expression<Func<TModel, bool>> expression) {
-            Expression converted = Expression.Convert(expression.Body, typeof(object));
-            AddQueryModifier(q => q.Where(Expression.Lambda<Func<T, bool>>(converted, expression.Parameters)));
+        public void AddFilter<TModel>(Expression<Func<TModel, bool>> expression) {
+            AddQueryModifier(q => q.Where(Expression.Lambda<Func<T, bool>>(expression.Body, expression.Parameters)));
         }
 
         private DateRange GetDateRange() {

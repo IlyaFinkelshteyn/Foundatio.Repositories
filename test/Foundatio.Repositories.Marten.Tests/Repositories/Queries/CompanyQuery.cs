@@ -31,9 +31,9 @@ namespace Foundatio.Repositories.Marten.Tests.Repositories.Queries {
                 return Task.CompletedTask;
 
             if (companyIds.Count == 1)
-                ctx.QueryAnd<Employee>(e => e.CompanyId == companyIds.Single());
+                ctx.AddFilter<Employee>(e => e.CompanyId == companyIds.Single());
             else
-                ctx.QueryAnd<Employee>(e => companyIds.Contains(e.CompanyId));
+                ctx.AddFilter<Employee>(e => companyIds.Contains(e.CompanyId));
 
             return Task.CompletedTask;
         }

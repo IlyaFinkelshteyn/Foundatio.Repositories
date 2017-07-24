@@ -1,5 +1,7 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Threading.Tasks;
 using Foundatio.Repositories.Marten.Tests.Repositories.Models;
 using Foundatio.Repositories.Marten.Queries.Builders;
@@ -36,11 +38,11 @@ namespace Foundatio.Repositories.Marten.Tests.Repositories.Queries {
             var ages = ctx.Source.GetAges();
             if (ages.Count <= 0)
                 return Task.CompletedTask;
-
+            
             if (ages.Count == 1)
-                ctx.QueryAnd<Employee>(e => e.Age == ages.First());
+                ctx.AddFilter<Employee>(e => e.Age == ages.First());
             else
-                ctx.QueryAnd<Employee>(e => ages.Contains(e.Age));
+                ctx.AddFilter<Employee>(e => ages.Contains(e.Age));
 
             return Task.CompletedTask;
         }

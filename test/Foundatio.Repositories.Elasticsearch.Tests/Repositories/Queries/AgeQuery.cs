@@ -39,7 +39,7 @@ namespace Foundatio.Repositories.Elasticsearch.Tests.Repositories.Queries {
                 return Task.CompletedTask;
 
             if (ages.Count == 1)
-                ctx.Filter &= Query<Employee>.Term(f => f.Age, ages.First());
+                ctx.Filter &= Query<Employee>.Term(f => f.Age, ages.Single());
             else
                 ctx.Filter &= Query<Employee>.Terms(d => d.Field(f => f.Age).Terms(ages));
 
