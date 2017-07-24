@@ -10,13 +10,13 @@ using Xunit;
 using Xunit.Abstractions;
 
 namespace Foundatio.Repositories.Marten.Tests {
-    public sealed class ReadOnlyRepositoryTests : ElasticRepositoryTestBase {
+    public sealed class ReadOnlyRepositoryTests : MartenRepositoryTestBase {
         private readonly IdentityRepository _identityRepository;
         private readonly EmployeeRepository _employeeRepository;
 
         public ReadOnlyRepositoryTests(ITestOutputHelper output) : base(output) {
-            _identityRepository = new IdentityRepository(_configuration);
-            _employeeRepository = new EmployeeRepository(_configuration);
+            _identityRepository = new IdentityRepository(_store, _cache, Log, _messageBus);
+            _employeeRepository = new EmployeeRepository(_store, _cache, Log, _messageBus);
 
             RemoveDataAsync().GetAwaiter().GetResult();
         }

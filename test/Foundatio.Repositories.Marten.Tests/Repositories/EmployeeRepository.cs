@@ -9,6 +9,7 @@ using Foundatio.Repositories.Models;
 using Foundatio.Repositories.Options;
 using Foundatio.Repositories.Advanced;
 using Marten;
+using System;
 
 namespace Foundatio.Repositories.Marten.Tests {
     public class EmployeeRepository : MartenRepositoryBase<Employee> {
@@ -81,6 +82,14 @@ namespace Foundatio.Repositories.Marten.Tests {
             }
 
             await base.InvalidateCacheAsync(documents, options);
+        }
+
+        public Task<long> UpdateCompanyNameByCompanyAsync(string company, string name, int? limit = null) {
+            throw new NotImplementedException();
+        }
+
+        public Task<long> IncrementYearsEmployeedAsync(string[] ids, int years = 1) {
+            throw new NotImplementedException();
         }
     }
 }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using AutoMapper;
+using AutoMapper.QueryableExtensions;
 using Foundatio.Caching;
 using Foundatio.Logging;
 using Foundatio.Repositories.Advanced;
@@ -29,6 +30,7 @@ namespace Foundatio.Repositories.Marten {
         protected readonly DocumentStore _store;
         protected readonly DocumentMapping _mapping;
         protected readonly ILogger _logger;
+        protected readonly IMapper _mapper;
 
         private ScopedCacheClient _scopedCacheClient;
 
@@ -40,6 +42,9 @@ namespace Foundatio.Repositories.Marten {
 
             SetCache(cacheClient);
             _logger = loggerFactory.CreateLogger(GetType());
+
+            var config = new MapperConfiguration(cfg => { cfg.CreateMissingTypeMaps = true; });
+            _mapper = config.CreateMapper();
         }
 
         protected ICollection<QueryField> DefaultExcludes { get; } = new List<QueryField>();
@@ -83,15 +88,14 @@ namespace Foundatio.Repositories.Marten {
 
             using (var session = _store.QuerySession()) {
                 QueryStatistics stats;
-                var response = await session.Query<T>(query, options).Stats(out stats).ToListAsync().AnyContext(); ;
-                var mappedResponse = Mapper.Map<IReadOnlyList<TResult>>(response);
+                var response = session.Query<T>(query, options).Stats(out stats).ToList();
 
                 if (options.HasPageLimit()) {
-                    result = ToFindResults<TResult>(mappedResponse, stats.TotalResults);
+                    result = ToFindResults(response.Select(r => _mapper.Map<T, TResult>(r)).ToList(), stats.TotalResults);
                     result.HasMore = response.Count > options.GetLimit();
-                    ((IGetNextPage<TResult>)result).GetNextPageFunc = GetNextPageFunc;
+                    ((IGetNextPage<TResult>) result).GetNextPageFunc = GetNextPageFunc;
                 } else {
-                    result = ToFindResults(mappedResponse, stats.TotalResults);
+                    result = ToFindResults(response.Select(r => _mapper.Map<T, TResult>(r)).ToList(), stats.TotalResults);
                 }
 
                 result.Page = options.GetPage();

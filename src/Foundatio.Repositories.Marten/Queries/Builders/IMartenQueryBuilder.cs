@@ -76,7 +76,8 @@ namespace Foundatio.Repositories.Marten.Queries.Builders {
             var context = new QueryBuilderContext<T>(query, options, session.DocumentStore as DocumentStore);
             MartenQueryBuilder.Default.BuildAsync(context).AnyContext().GetAwaiter().GetResult();
             var result = session.Query<T>();
-            return context.ConfigureQuery(result).As<IMartenQueryable<T>>();
+            var q = context.ConfigureQuery(result);
+            return q.As<IMartenQueryable<T>>();
         }
 
         public static async Task<QueryBuilderContext<T>> BuildAsync<T>(this IMartenQueryBuilder builder, IRepositoryQuery query, ICommandOptions options, IDocumentStore store) where T : class, new() {

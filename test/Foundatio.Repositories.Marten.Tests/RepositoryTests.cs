@@ -17,15 +17,15 @@ using Xunit.Abstractions;
 using LogLevel = Foundatio.Logging.LogLevel;
 
 namespace Foundatio.Repositories.Marten.Tests {
-    public sealed class RepositoryTests : ElasticRepositoryTestBase {
+    public sealed class RepositoryTests : MartenRepositoryTestBase {
         private readonly EmployeeRepository _employeeRepository;
         private readonly IdentityRepository _identityRepository;
         private readonly IdentityRepository _identityRepositoryWithNoCaching;
 
         public RepositoryTests(ITestOutputHelper output) : base(output) {
-            _employeeRepository = new EmployeeRepository(_configuration);
-            _identityRepository = new IdentityRepository(_configuration);
-            _identityRepositoryWithNoCaching = new IdentityWithNoCachingRepository(_configuration);
+            _employeeRepository = new EmployeeRepository(_store, _cache, Log, _messageBus);
+            _identityRepository = new IdentityRepository(_store, _cache, Log, _messageBus);
+            _identityRepositoryWithNoCaching = new IdentityWithNoCachingRepository(_store, _cache, Log, _messageBus);
 
             RemoveDataAsync().GetAwaiter().GetResult();
         }
@@ -93,14 +93,14 @@ namespace Foundatio.Repositories.Marten.Tests {
 
             await _employeeRepository.AddAsync(EmployeeGenerator.Generate(), o => o.ImmediateConsistency());
 
-            var allEmployees = await _employeeRepository.SearchAsync(new RepositoryQuery().SoftDeleteMode(SoftDeleteQueryMode.All));
+            var allEmployees = await _employeeRepository.FindAsync(new RepositoryQuery().SoftDeleteMode(SoftDeleteQueryMode.All));
             Assert.Equal(2, allEmployees.Total);
 
-            var onlyDeleted = await _employeeRepository.SearchAsync(new RepositoryQuery().SoftDeleteMode(SoftDeleteQueryMode.All), "isDeleted:true");
+            var onlyDeleted = await _employeeRepository.FindAsync(new RepositoryQuery().SoftDeleteMode(SoftDeleteQueryMode.DeletedOnly));
             Assert.Equal(1, onlyDeleted.Total);
             Assert.Equal(employee1.Id, onlyDeleted.Documents.First().Id);
 
-            var nonDeletedEmployees = await _employeeRepository.SearchAsync(null);
+            var nonDeletedEmployees = await _employeeRepository.GetAllAsync();
             Assert.Equal(1, nonDeletedEmployees.Total);
             Assert.NotEqual(employee1.Id, nonDeletedEmployees.Documents.First().Id);
         }

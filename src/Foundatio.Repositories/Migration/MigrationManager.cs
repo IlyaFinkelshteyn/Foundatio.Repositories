@@ -22,7 +22,7 @@ namespace Foundatio.Repositories.Migrations {
         }
 
         public void AddMigrationsFromLoadedAssemblies() {
-            var migrationTypes = GetDerivedTypes<IMigration>(AppDomain.CurrentDomain.GetAssemblies());
+            var migrationTypes = GetDerivedTypes<IMigration>(new[] { Assembly.GetCallingAssembly() });
             AddMigration(migrationTypes);
         }
 
@@ -54,9 +54,6 @@ namespace Foundatio.Repositories.Migrations {
         public bool ShouldRunUnversionedMigrations { get; set; } = false;
 
         public async Task RunMigrationsAsync() {
-            if (Migrations.Count == 0)
-                AddMigrationsFromLoadedAssemblies();
-
             var migrations = await GetPendingMigrationsAsync();
             foreach (var migration in migrations) {
                 if (migration.Version.HasValue)
@@ -105,8 +102,8 @@ namespace Foundatio.Repositories.Migrations {
 
         private static IEnumerable<Type> GetDerivedTypes<TAction>(IList<Assembly> assemblies = null) {
             if (assemblies == null || assemblies.Count == 0)
-                assemblies = AppDomain.CurrentDomain.GetAssemblies();
-
+                assemblies = new List<Assembly>(new[] { Assembly.GetCallingAssembly() });
+            
             var types = new List<Type>();
             foreach (var assembly in assemblies) {
                 try {

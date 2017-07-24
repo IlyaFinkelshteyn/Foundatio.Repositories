@@ -696,7 +696,7 @@ namespace Foundatio.Repositories.Marten {
 
         private async Task StoreDocumentsAsync(IReadOnlyCollection<T> documents, bool isCreateOperation, ICommandOptions options) {
             using (var session = _store.LightweightSession()) {
-                session.Store(documents);
+                session.Store(documents.ToArray());
                 await session.SaveChangesAsync();
             }
 

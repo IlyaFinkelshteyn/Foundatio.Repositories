@@ -21,8 +21,8 @@ namespace Foundatio.Repositories.Utility {
         private readonly int _increment;
 
         static ObjectId() {
-            __staticMachine = (GetMachineHash() + AppDomain.CurrentDomain.FriendlyName.GetHashCode()) & 0x00ffffff;
-            __staticIncrement = (new Random()).Next();
+            __staticMachine = GetMachineHash() & 0x00ffffff;
+            __staticIncrement = new Random().Next();
 
             try {
                 __staticPid = (short)GetCurrentProcessId();

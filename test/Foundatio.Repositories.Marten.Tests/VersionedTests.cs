@@ -11,11 +11,11 @@ using Xunit.Abstractions;
 using LogLevel = Foundatio.Logging.LogLevel;
 
 namespace Foundatio.Repositories.Marten.Tests {
-    public sealed class VersionedTests : ElasticRepositoryTestBase {
+    public sealed class VersionedTests : MartenRepositoryTestBase {
         private readonly EmployeeRepository _employeeRepository;
 
         public VersionedTests(ITestOutputHelper output) : base(output) {
-            _employeeRepository = new EmployeeRepository(_configuration);
+            _employeeRepository = new EmployeeRepository(_store, _cache, Log, _messageBus);
 
             RemoveDataAsync().GetAwaiter().GetResult();
         }
