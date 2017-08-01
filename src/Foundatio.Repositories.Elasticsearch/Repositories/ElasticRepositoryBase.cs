@@ -314,7 +314,7 @@ namespace Foundatio.Repositories.Elasticsearch {
                                 .Index(h.GetIndex())
                                 .Type(h.GetIndexType())
                                 .Pipeline(pipeline)
-                                .Version(h.GetVersionAsLongOrDefault()));
+                                .Version(h.GetVersionAsLong()));
                         }
 
                         return b;
@@ -762,8 +762,9 @@ namespace Foundatio.Repositories.Elasticsearch {
                         i.Index(GetDocumentIndexFunc(document));
 
                     if (HasVersion && !isCreateOperation) {
-                        var versionedDoc = (IVersioned)document;
-                        i.Version(versionedDoc.GetVersionAsLongOrDefault());
+                        long? version = (document as IVersioned)?.GetVersionAsLong();
+                        if (version.HasValue)
+                            i.Version(version.Value);
                     }
 
                     return i;
@@ -800,7 +801,7 @@ namespace Foundatio.Repositories.Elasticsearch {
                     if (HasVersion && !isCreateOperation) {
                         var versionedDoc = (IVersioned)d;
                         if (versionedDoc != null)
-                            o.Version = versionedDoc.GetVersionAsLongOrDefault();
+                            o.Version = versionedDoc.GetVersionAsLong();
                     }
 
                     return o;

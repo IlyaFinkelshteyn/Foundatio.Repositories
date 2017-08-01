@@ -36,15 +36,14 @@ namespace Foundatio.Repositories.Elasticsearch.Tests.Repositories.Models {
 
         protected bool Equals(Employee other) {
             return String.Equals(Id, other.Id, StringComparison.InvariantCultureIgnoreCase) &&
-                String.Equals(CompanyId, other.CompanyId, StringComparison.InvariantCultureIgnoreCase) &&
-                String.Equals(CompanyName, other.CompanyName, StringComparison.InvariantCultureIgnoreCase) &&
-                String.Equals(Name, other.Name, StringComparison.InvariantCultureIgnoreCase) &&
-                Age == other.Age &&
-                YearsEmployed == other.YearsEmployed &&
-                LastReview.Equals(other.LastReview) &&
-                CreatedUtc.Equals(other.CreatedUtc) &&
-                UpdatedUtc.Equals(other.UpdatedUtc) &&
-                Version == other.Version;
+                   String.Equals(CompanyId, other.CompanyId, StringComparison.InvariantCultureIgnoreCase) &&
+                   String.Equals(CompanyName, other.CompanyName, StringComparison.InvariantCultureIgnoreCase) &&
+                   String.Equals(Name, other.Name, StringComparison.InvariantCultureIgnoreCase) &&
+                   Age == other.Age &&
+                   YearsEmployed == other.YearsEmployed &&
+                   LastReview.Equals(other.LastReview) &&
+                   CreatedUtc.Equals(other.CreatedUtc) &&
+                   UpdatedUtc.Equals(other.UpdatedUtc);
         }
 
         public override bool Equals(object obj) {
@@ -68,7 +67,6 @@ namespace Foundatio.Repositories.Elasticsearch.Tests.Repositories.Models {
                 hashCode = (hashCode * 397) ^ LastReview.GetHashCode();
                 hashCode = (hashCode * 397) ^ CreatedUtc.GetHashCode();
                 hashCode = (hashCode * 397) ^ UpdatedUtc.GetHashCode();
-                hashCode = (hashCode * 397) ^ Version.GetHashCode();
                 return hashCode;
             }
         }

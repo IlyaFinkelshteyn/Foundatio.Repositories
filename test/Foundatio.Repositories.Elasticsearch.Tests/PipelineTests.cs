@@ -71,7 +71,7 @@ namespace Foundatio.Repositories.Elasticsearch.Tests {
             employee = await _employeeRepository.GetByIdAsync(employee.Id);
             Assert.Equal(EmployeeGenerator.Default.Age, employee.Age);
             Assert.Equal("patched", employee.Name);
-            Assert.Equal(2, employee.Version);
+            Assert.Equal(2, employee.GetVersionAsLongOrDefault());
         }
 
         [Fact]

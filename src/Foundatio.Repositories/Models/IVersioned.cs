@@ -66,9 +66,12 @@ namespace Foundatio.Repositories.Models {
             if (version is long)
                 return (long)version;
 
+            if (version is int)
+                return Convert.ToInt64(version);
+
             var s = version as string;
             if (s != null)
-                return Int32.Parse(s);
+                return Int64.Parse(s);
 
             return null;
         }
