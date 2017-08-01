@@ -25,7 +25,7 @@ namespace Foundatio.Repositories.Options {
             return options.SafeHasOption(SetPagingOptionsExtensions.PageLimitKey);
         }
 
-        public static int GetLimit(this ICommandOptions options) {
+        public static int GetPageLimit(this ICommandOptions options) {
             int limit = options.SafeGetOption(SetPagingOptionsExtensions.PageLimitKey, RepositoryConstants.DEFAULT_LIMIT);
 
             if (limit > RepositoryConstants.MAX_LIMIT)
@@ -50,7 +50,7 @@ namespace Foundatio.Repositories.Options {
             if (!options.HasPageLimit() && !options.HasPageNumber())
                 return 0;
 
-            int limit = options.GetLimit();
+            int limit = options.GetPageLimit();
             int page = options.GetPage();
 
             int skip = (page - 1) * limit;

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Foundatio.Repositories.Elasticsearch.Tests.Repositories.Models;
 using Foundatio.Repositories.Extensions;
+using Foundatio.Repositories.Models;
 using Foundatio.Repositories.Utility;
 using Foundatio.Utility;
 using Xunit;
@@ -76,9 +77,9 @@ namespace Foundatio.Repositories.Elasticsearch.Tests {
             employee.CompanyName = employeeCopy.CompanyName = "updated";
 
             employee = await _employeeRepository.SaveAsync(employee);
-            Assert.Equal(employeeCopy.Version + 1, employee.Version);
+            Assert.Equal(employeeCopy.GetVersionAsLongOrDefault() + 1, employee.Version);
 
-            long version = employeeCopy.Version;
+            long version = employeeCopy.GetVersionAsLongOrDefault();
             await Assert.ThrowsAsync<ApplicationException>(async () => await _employeeRepository.SaveAsync(employeeCopy));
             Assert.Equal(version, employeeCopy.Version);
 
@@ -152,7 +153,7 @@ namespace Foundatio.Repositories.Elasticsearch.Tests {
             };
 
             await _employeeRepository.AddAsync(employees, o => o.ImmediateConsistency());
-            Assert.True(employees.All(e => e.Version == 1));
+            Assert.True(employees.All(e => e.GetVersionAsLongOrDefault() == 1));
 
             Assert.Equal(2, await _employeeRepository.UpdateCompanyNameByCompanyAsync("1", "Test Company"));
 
@@ -169,7 +170,7 @@ namespace Foundatio.Repositories.Elasticsearch.Tests {
             Assert.Equal(employees.First(e => e.CompanyId == "2"), results.Documents.First());
 
             var company2Employees = results.Documents.ToList();
-            long company2EmployeesVersion = company2Employees.First().Version;
+            long company2EmployeesVersion = company2Employees.First().GetVersionAsLongOrDefault();
             Assert.Equal(1, await _employeeRepository.IncrementYearsEmployeedAsync(company2Employees.Select(e => e.Id).ToArray()));
 
             results = await _employeeRepository.GetAllByCompanyAsync("2");

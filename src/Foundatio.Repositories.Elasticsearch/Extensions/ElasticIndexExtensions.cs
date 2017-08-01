@@ -26,7 +26,7 @@ namespace Foundatio.Repositories.Elasticsearch.Extensions {
                 versionedDoc.Version = hit.Version;
 
             var data = new DataDictionary { { ElasticDataKeys.Index, hit.Index }, { ElasticDataKeys.IndexType, hit.Type } };
-            return new FindHit<T>(hit.Id, hit.Source, 0, versionedDoc?.Version ?? null, hit.Routing, data);
+            return new FindHit<T>(hit.Id, hit.Source, 0, versionedDoc?.Version, hit.Routing, data);
         }
 
         public static FindHit<T> ToFindHit<T>(this Nest.IHit<T> hit) where T : class {
@@ -35,7 +35,7 @@ namespace Foundatio.Repositories.Elasticsearch.Extensions {
                 versionedDoc.Version = hit.Version.Value;
 
             var data = new DataDictionary { { ElasticDataKeys.Index, hit.Index }, { ElasticDataKeys.IndexType, hit.Type } };
-            return new FindHit<T>(hit.Id, hit.Source, hit.Score.GetValueOrDefault(), versionedDoc?.Version ?? null, hit.Routing, data);
+            return new FindHit<T>(hit.Id, hit.Source, hit.Score.GetValueOrDefault(), versionedDoc?.Version, hit.Routing, data);
         }
 
         public static FindHit<T> ToFindHit<T>(this Nest.IMultiGetHit<T> hit) where T : class {
@@ -44,7 +44,7 @@ namespace Foundatio.Repositories.Elasticsearch.Extensions {
                 versionedDoc.Version = hit.Version;
 
             var data = new DataDictionary { { ElasticDataKeys.Index, hit.Index }, { ElasticDataKeys.IndexType, hit.Type } };
-            return new FindHit<T>(hit.Id, hit.Source, 0, versionedDoc?.Version ?? null, hit.Routing, data);
+            return new FindHit<T>(hit.Id, hit.Source, 0, versionedDoc?.Version, hit.Routing, data);
         }
 
         private static readonly long _epochTicks = new DateTimeOffset(1970, 1, 1, 0, 0, 0, 0, TimeSpan.Zero).Ticks;

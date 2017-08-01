@@ -8,7 +8,9 @@ using Foundatio.Caching;
 using Foundatio.Logging;
 using Foundatio.Messaging;
 using Foundatio.Repositories.Advanced;
+using Foundatio.Repositories.Exceptions;
 using Foundatio.Repositories.Extensions;
+using Foundatio.Repositories.JsonPatch;
 using Foundatio.Repositories.Marten.Queries;
 using Foundatio.Repositories.Marten.Queries.Builders;
 using Foundatio.Repositories.Models;
@@ -17,6 +19,9 @@ using Foundatio.Utility;
 using Foundatio.Repositories.Options;
 using Marten;
 using Marten.Linq;
+using Marten.Patching;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Foundatio.Repositories.Marten {
     public abstract class MartenRepositoryBase<T> : MartenReadOnlyRepositoryBase<T>, IAdvancedRepository<T> where T : class, IIdentity, new() {
@@ -288,161 +293,88 @@ namespace Foundatio.Repositories.Marten {
             return Task.CompletedTask;
         }
 
-        public Task<long> PatchAllAsync(IRepositoryQuery query, IPatchOperation operation, ICommandOptions options = null) {
-            //if (query == null)
-            //    throw new ArgumentNullException(nameof(query));
+        public async Task<long> PatchAllAsync(IRepositoryQuery query, IPatchOperation operation, ICommandOptions options = null) {
+            if (query == null)
+                throw new ArgumentNullException(nameof(query));
 
-            //if (operation == null)
-            //    throw new ArgumentNullException(nameof(operation));
+            if (operation == null)
+                throw new ArgumentNullException(nameof(operation));
 
-            //options = ConfigureOptions(options);
+            options = ConfigureOptions(options);
 
-            //long affectedRecords = 0;
-            //var pipelinedIndexType = ElasticType as IHavePipelinedIndexType;
-            //string pipeline = pipelinedIndexType?.Pipeline;
-            //if (operation is Models.JsonPatch jsonOperation) {
-            //    var patcher = new JsonPatcher();
-            //    affectedRecords += await BatchProcessAsAsync<JObject>(query, async results => {
-            //        var bulkResult = await _client.BulkAsync(b => {
-            //            b.Refresh(options.GetRefreshMode(ElasticType.DefaultConsistency));
-            //            foreach (var h in results.Hits) {
-            //                var target = h.Document as JToken;
-            //                patcher.Patch(ref target, jsonOperation.Patch);
+            long affectedRecords = 0;
+            if (operation is Models.JsonPatch jsonOperation) {
+                var patcher = new JsonPatcher();
+                affectedRecords += await BatchProcessAsAsync<JObject>(query, async results => {
+                    using (var session = _store.LightweightSession()) {
+                        foreach (var h in results.Hits) {
+                            var target = h.Document as JToken;
+                            patcher.Patch(ref target, jsonOperation.Patch);
+                            session.Store(target.ToObject<T>());
+                        }
 
-            //                b.Index<JObject>(i => i
-            //                    .Document(target as JObject)
-            //                    .Id(h.Id)
-            //                    .Routing(h.Routing)
-            //                    .Index(h.GetIndex())
-            //                    .Type(h.GetIndexType())
-            //                    .Pipeline(pipeline)
-            //                    .Version(h.Version));
-            //            }
+                        await session.SaveChangesAsync().AnyContext();
+                    }
 
-            //            return b;
-            //        }).AnyContext();
-            //        _logger.Trace(() => bulkResult.GetRequest());
+                    var updatedIds = results.Hits.Select(h => h.Id).ToList();
+                    if (IsCacheEnabled)
+                        await Cache.RemoveAllAsync(updatedIds).AnyContext();
 
-            //        if (!bulkResult.IsValid) {
-            //            _logger.Error()
-            //                .Exception(bulkResult.OriginalException)
-            //                .Message($"Error occurred while bulk updating: {bulkResult.GetErrorMessage()}")
-            //                .Property("Query", query)
-            //                .Property("Operation", operation)
-            //                .Write();
+                    try {
+                        options.GetUpdatedIdsCallback()?.Invoke(updatedIds);
+                    }
+                    catch (Exception ex) {
+                        _logger.Error(ex, "Error calling updated ids callback.");
+                    }
 
-            //            return false;
-            //        }
+                    return true;
+                }, options.Clone()).AnyContext();
+            }
+            else {
+                var scriptOperation = operation as ScriptPatch;
+                var partialOperation = operation as PartialPatch;
+                if (scriptOperation == null && partialOperation == null)
+                    throw new ArgumentException("Unknown operation type", nameof(operation));
 
-            //        var updatedIds = results.Hits.Select(h => h.Id).ToList();
-            //        if (IsCacheEnabled)
-            //            await Cache.RemoveAllAsync(updatedIds).AnyContext();
+                if (scriptOperation != null)
+                    throw new ArgumentException("Script operation not supported", nameof(operation));
 
-            //        try {
-            //            options.GetUpdatedIdsCallback()?.Invoke(updatedIds);
-            //        }
-            //        catch (Exception ex) {
-            //            _logger.Error(ex, "Error calling updated ids callback.");
-            //        }
+                if (!query.GetIncludes().Contains(_idField))
+                    query.Include(_idField);
 
-            //        return true;
-            //    }, options.Clone()).AnyContext();
-            //}
-            //else {
-            //    var scriptOperation = operation as ScriptPatch;
-            //    var partialOperation = operation as PartialPatch;
-            //    if (scriptOperation == null && partialOperation == null)
-            //        throw new ArgumentException("Unknown operation type", nameof(operation));
+                affectedRecords += await BatchProcessAsAsync<JObject>(query, async results => {
+                    using (var session = _store.LightweightSession()) {
+                        foreach (var h in results.Hits) {
+                            h.Document.Merge(JsonConvert.SerializeObject(partialOperation.Document));
+                            session.Store(h.Document.ToObject<T>());
+                        }
 
-            //    if (!IsCacheEnabled && scriptOperation != null) {
-            //        var request = new UpdateByQueryRequest(Indices.Index(String.Join(",", GetIndexesByQuery(query))),
-            //            ElasticType.Name) {
-            //            Query = await ElasticType.QueryBuilder.BuildQueryAsync(query, options, new SearchDescriptor<T>()).AnyContext(),
-            //            Conflicts = Conflicts.Proceed,
-            //            Script = new InlineScript(scriptOperation.Script) { Params = scriptOperation.Params },
-            //            Pipeline = pipeline,
-            //            Version = HasVersion,
-            //            Refresh = options.GetRefreshMode(ElasticType.DefaultConsistency) != Refresh.False
-            //        };
+                        await session.SaveChangesAsync().AnyContext();
+                    }
 
-            //        var response = await _client.UpdateByQueryAsync(request).AnyContext();
-            //        _logger.Trace(() => response.GetRequest());
-            //        if (!response.IsValid) {
-            //            string message = response.GetErrorMessage();
-            //            _logger.Error().Exception(response.OriginalException).Message(message).Property("request", response.GetRequest()).Write();
-            //            throw new ApplicationException(message, response.OriginalException);
-            //        }
+                    var updatedIds = results.Hits.Select(h => h.Id).ToList();
+                    if (IsCacheEnabled)
+                        await Cache.RemoveAllAsync(updatedIds).AnyContext();
 
-            //        // TODO: What do we want to do about failures and timeouts?
-            //        affectedRecords += response.Updated + response.Noops;
-            //        Debug.Assert(response.Total == affectedRecords, "Unable to update all documents");
-            //    }
-            //    else {
-            //        if (!query.GetIncludes().Contains(_idField))
-            //            query.Include(_idField);
+                    try {
+                        options.GetUpdatedIdsCallback()?.Invoke(updatedIds);
+                    }
+                    catch (Exception ex) {
+                        _logger.Error(ex, "Error calling updated ids callback.");
+                    }
 
-            //        affectedRecords += await BatchProcessAsync(query, async results => {
-            //            var bulkResult = await _client.BulkAsync(b => {
-            //                b.Pipeline(pipeline);
-            //                b.Refresh(options.GetRefreshMode(ElasticType.DefaultConsistency));
+                    return true;
 
-            //                foreach (var h in results.Hits) {
-            //                    if (scriptOperation != null)
-            //                        b.Update<T>(u => u
-            //                            .Id(h.Id)
-            //                            .Routing(h.Routing)
-            //                            .Index(h.GetIndex())
-            //                            .Type(h.GetIndexType())
-            //                            .Script(s => s.Inline(scriptOperation.Script).Params(scriptOperation.Params))
-            //                            .RetriesOnConflict(10));
-            //                    else if (partialOperation != null)
-            //                        b.Update<T, object>(u => u.Id(h.Id)
-            //                            .Routing(h.Routing)
-            //                            .Index(h.GetIndex())
-            //                            .Type(h.GetIndexType())
-            //                            .Doc(partialOperation.Document));
-            //                }
+                }, options).AnyContext();
+            }
 
-            //                return b;
-            //            }).AnyContext();
-            //            _logger.Trace(() => bulkResult.GetRequest());
+            if (affectedRecords > 0) {
+                // TODO: Find a good way to invalidate cache and send changed notification
+                await OnDocumentsChangedAsync(ChangeType.Saved, EmptyList, options).AnyContext();
+                await SendQueryNotificationsAsync(ChangeType.Saved, query, options).AnyContext();
+            }
 
-            //            if (!bulkResult.IsValid) {
-            //                _logger.Error()
-            //                    .Exception(bulkResult.OriginalException)
-            //                    .Message($"Error occurred while bulk updating: {bulkResult.GetErrorMessage()}")
-            //                    .Property("Query", query)
-            //                    .Property("Operation", operation)
-            //                    .Write();
-
-            //                return false;
-            //            }
-
-            //            var updatedIds = results.Hits.Select(h => h.Id).ToList();
-            //            if (IsCacheEnabled)
-            //                await Cache.RemoveAllAsync(updatedIds).AnyContext();
-
-            //            try {
-            //                options.GetUpdatedIdsCallback()?.Invoke(updatedIds);
-            //            }
-            //            catch (Exception ex) {
-            //                _logger.Error(ex, "Error calling updated ids callback.");
-            //            }
-
-            //            return true;
-            //        }, options).AnyContext();
-            //    }
-            //}
-
-            //if (affectedRecords > 0) {
-            //    // TODO: Find a good way to invalidate cache and send changed notification
-            //    await OnDocumentsChangedAsync(ChangeType.Saved, EmptyList, options).AnyContext();
-            //    await SendQueryNotificationsAsync(ChangeType.Saved, query, options).AnyContext();
-            //}
-
-            //return affectedRecords;
-
-            return Task.FromResult(0L);
+            return affectedRecords;
         }
 
         public Task RemoveAsync(Id id, ICommandOptions options = null) {
@@ -696,8 +628,27 @@ namespace Foundatio.Repositories.Marten {
 
         private async Task StoreDocumentsAsync(IReadOnlyCollection<T> documents, bool isCreateOperation, ICommandOptions options) {
             using (var session = _store.LightweightSession()) {
-                session.Store(documents.ToArray());
-                await session.SaveChangesAsync();
+                foreach (var doc in documents) {
+                    if (isCreateOperation) {
+                        session.Insert(doc);
+                    } else {
+                        if (HasVersion)
+                            session.Store(doc, ((IVersioned)doc).GetVersionAsGuidOrDefault());
+                        else
+                            session.Store(doc);
+                    }
+                }
+
+                try {
+                    await session.SaveChangesAsync();
+                } catch (MartenCommandException ex) {
+                    if (ex.InnerException is Npgsql.PostgresException inner && inner.Code == "23505")
+                        throw new DuplicateDocumentException(inner.Message, ex);
+
+                    throw;
+                }
+
+                var m = session.Tenant.MetadataFor(documents.First());
             }
 
             // TODO: How to handle IVersioned documents

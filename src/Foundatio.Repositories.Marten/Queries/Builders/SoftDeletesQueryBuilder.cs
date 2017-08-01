@@ -1,12 +1,30 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Collections.Concurrent;
+using System.Threading.Tasks;
+using Baseline.Reflection;
+using Foundatio.Repositories.Models;
 using Foundatio.Repositories.Queries;
 using Marten.Linq;
-using Marten.Schema;
 
 namespace Foundatio.Repositories.Marten.Queries.Builders {
     public class SoftDeletesQueryBuilder : IMartenQueryBuilder {
+        private static readonly ConcurrentDictionary<Type, SoftDeleteInfo> _softDeleteInfos = new ConcurrentDictionary<Type, SoftDeleteInfo>();
+
         public Task BuildAsync<T>(QueryBuilderContext<T> ctx) where T : class, new() {
-            if (ctx.Mapping.DeleteStyle != DeleteStyle.SoftDelete)
+            var softDeleteInfo = _softDeleteInfos.GetOrAdd(typeof(T), t => {
+                bool isSupported = typeof(ISupportSoftDeletes).IsAssignableFrom(typeof(T));
+                if (!isSupported)
+                    return new SoftDeleteInfo { IsSupported = false };
+
+                var field = ctx.Mapping.FieldFor(ReflectionHelper.GetProperty((ISupportSoftDeletes d) => d.IsDeleted));
+
+                return new SoftDeleteInfo {
+                    IsSupported = true,
+                    SqlField = field.SqlLocator
+                };
+            });
+
+            if (!softDeleteInfo.IsSupported)
                 return Task.CompletedTask;
 
             var mode = ctx.Source.GetSoftDeleteMode();
@@ -17,13 +35,18 @@ namespace Foundatio.Repositories.Marten.Queries.Builders {
                 return Task.CompletedTask;
 
             if (mode == SoftDeleteQueryMode.All)
-                ctx.WhereFragments.Add(new WhereFragment($"d.{DocumentMapping.DeletedColumn} is not null"));
+                ctx.WhereFragments.Add(new WhereFragment($"{softDeleteInfo.SqlField} is not null"));
             if (mode == SoftDeleteQueryMode.ActiveOnly)
-                ctx.WhereFragments.Add(new WhereFragment($"d.{DocumentMapping.DeletedColumn} = False"));
+                ctx.WhereFragments.Add(new WhereFragment($"{softDeleteInfo.SqlField} = False"));
             if (mode == SoftDeleteQueryMode.DeletedOnly)
-                ctx.WhereFragments.Add(new WhereFragment($"d.{DocumentMapping.DeletedColumn} = True"));
+                ctx.WhereFragments.Add(new WhereFragment($"{softDeleteInfo.SqlField} = True"));
 
             return Task.CompletedTask;
+        }
+
+        private class SoftDeleteInfo {
+            public bool IsSupported { get; set; }
+            public string SqlField { get; set; }
         }
     }
 }

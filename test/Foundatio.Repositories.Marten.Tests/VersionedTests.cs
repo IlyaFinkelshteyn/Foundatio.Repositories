@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Foundatio.Repositories.Marten.Tests.Repositories.Models;
 using Foundatio.Repositories.Extensions;
+using Foundatio.Repositories.Models;
 using Foundatio.Repositories.Utility;
 using Foundatio.Utility;
 using Xunit;
@@ -23,36 +24,24 @@ namespace Foundatio.Repositories.Marten.Tests {
         [Fact]
         public async Task AddAsync() {
             var employee = EmployeeGenerator.Default;
-            Assert.Equal(0, employee.Version);
+            Assert.Equal(Guid.Empty, employee.Version);
 
             employee = await _employeeRepository.AddAsync(employee);
             Assert.NotNull(employee?.Id);
-            Assert.Equal(1, employee.Version);
+            Assert.NotEqual(Guid.Empty, employee.Version);
 
             var employee2 = await _employeeRepository.GetByIdAsync(employee.Id);
             Assert.Equal(employee, employee2);
         }
 
         [Fact]
-        public async Task AddAndIgnoreHighVersionAsync() {
-            var employee = EmployeeGenerator.Generate();
-            employee.Version = 5;
-
-            employee = await _employeeRepository.AddAsync(employee);
-            Assert.NotNull(employee?.Id);
-            Assert.Equal(1, employee.Version);
-
-            Assert.Equal(employee, await _employeeRepository.GetByIdAsync(employee.Id));
-        }
-
-        [Fact]
         public async Task AddCollectionAsync() {
             var employee = EmployeeGenerator.Default;
-            Assert.Equal(0, employee.Version);
+            Assert.Equal(Guid.Empty, employee.Version);
 
             var employees = new List<Employee> { employee, EmployeeGenerator.Generate() };
             await _employeeRepository.AddAsync(employees);
-            Assert.Equal(1, employee.Version);
+            Assert.NotEqual(Guid.Empty, employee.Version);
 
             var result = await _employeeRepository.GetByIdsAsync(employees.Select(e => e.Id).ToList());
             Assert.Equal(2, result.Count);
@@ -63,22 +52,23 @@ namespace Foundatio.Repositories.Marten.Tests {
         [Fact]
         public async Task SaveAsync() {
             var employee = EmployeeGenerator.Default;
-            Assert.Equal(0, employee.Version);
+            Assert.Equal(Guid.Empty, employee.Version);
 
             await _employeeRepository.AddAsync(new List<Employee> { employee });
-            Assert.Equal(1, employee.Version);
+            Assert.NotEqual(Guid.Empty, employee.Version);
+            Guid version = employee.GetVersionAsGuidOrDefault();
 
             employee = await _employeeRepository.GetByIdAsync(employee.Id);
             var employeeCopy = await _employeeRepository.GetByIdAsync(employee.Id);
             Assert.Equal(employee, employeeCopy);
-            Assert.Equal(1, employee.Version);
+            Assert.Equal(employeeCopy.Version, employee.Version);
 
             employee.CompanyName = employeeCopy.CompanyName = "updated";
 
             employee = await _employeeRepository.SaveAsync(employee);
-            Assert.Equal(employeeCopy.Version + 1, employee.Version);
+            Assert.NotEqual(version, employee.Version);
 
-            long version = employeeCopy.Version;
+            version = employeeCopy.GetVersionAsGuidOrDefault();
             await Assert.ThrowsAsync<ApplicationException>(async () => await _employeeRepository.SaveAsync(employeeCopy));
             Assert.Equal(version, employeeCopy.Version);
 
@@ -91,43 +81,43 @@ namespace Foundatio.Repositories.Marten.Tests {
         [Fact]
         public async Task SaveWithHigherVersionAsync() {
             var employee = EmployeeGenerator.Default;
-            Assert.Equal(0, employee.Version);
+            Assert.Equal(Guid.Empty, employee.Version);
 
             await _employeeRepository.AddAsync(new List<Employee> { employee });
-            Assert.Equal(1, employee.Version);
+            Assert.NotEqual(Guid.Empty, employee.Version);
 
-            employee.Version = 5;
+            employee.Version = Guid.NewGuid();
             await Assert.ThrowsAsync<ApplicationException>(async () => await _employeeRepository.SaveAsync(employee));
         }
 
         [Fact]
         public async Task SaveCollectionAsync() {
             var employee1 = EmployeeGenerator.Default;
-            Assert.Equal(0, employee1.Version);
+            Assert.Equal(Guid.Empty, employee1.Version);
 
             var employee2 = EmployeeGenerator.Generate();
             await _employeeRepository.AddAsync(new List<Employee> { employee1, employee2 });
-            Assert.Equal(1, employee1.Version);
-            Assert.Equal(1, employee2.Version);
+            Assert.NotEqual(Guid.Empty, employee1.Version);
+            Assert.NotEqual(Guid.Empty, employee2.Version);
 
             var employee1Version1Copy = await _employeeRepository.GetByIdAsync(employee1.Id);
-            Assert.Equal(1, employee1Version1Copy.Version);
+            Assert.NotEqual(Guid.Empty, employee1Version1Copy.Version);
             Assert.Equal(employee1, employee1Version1Copy);
 
             employee1.CompanyName = employee1Version1Copy.CompanyName = "updated";
             await _employeeRepository.SaveAsync(new List<Employee> { employee1, employee2 });
-            Assert.Equal(2, employee1.Version);
-            Assert.Equal(2, employee2.Version);
+            Assert.Equal(Guid.Empty, employee1.Version);
+            Assert.Equal(Guid.Empty, employee2.Version);
 
             await Assert.ThrowsAsync<ApplicationException>(async () => await _employeeRepository.SaveAsync(new List<Employee> { employee1Version1Copy, employee2 }));
-            Assert.Equal(1, employee1Version1Copy.Version);
-            Assert.Equal(2, employee1.Version);
-            Assert.Equal(3, employee2.Version);
+            Assert.Equal(Guid.Empty, employee1Version1Copy.Version);
+            Assert.Equal(Guid.Empty, employee1.Version);
+            Assert.Equal(Guid.Empty, employee2.Version);
 
             await Assert.ThrowsAsync<ApplicationException>(async () => await _employeeRepository.SaveAsync(new List<Employee> { employee1Version1Copy, employee2 }));
-            Assert.Equal(1, employee1Version1Copy.Version);
-            Assert.Equal(2, employee1.Version);
-            Assert.Equal(4, employee2.Version);
+            Assert.Equal(Guid.Empty, employee1Version1Copy.Version);
+            Assert.Equal(Guid.Empty, employee1.Version);
+            Assert.Equal(Guid.Empty, employee2.Version);
 
             Assert.Equal(employee2, await _employeeRepository.GetByIdAsync(employee2.Id));
         }
@@ -142,14 +132,14 @@ namespace Foundatio.Repositories.Marten.Tests {
             };
 
             await _employeeRepository.AddAsync(employees, o => o.ImmediateConsistency());
-            Assert.True(employees.All(e => e.Version == 1));
+            Assert.True(employees.All(e => e.GetVersionAsGuidOrDefault() != Guid.Empty));
 
             Assert.Equal(2, await _employeeRepository.UpdateCompanyNameByCompanyAsync("1", "Test Company"));
 
             var results = await _employeeRepository.GetAllByCompanyAsync("1");
             Assert.Equal(2, results.Documents.Count);
             foreach (var document in results.Documents) {
-                Assert.Equal(2, document.Version);
+                Assert.NotEqual(Guid.Empty, document.Version);
                 Assert.Equal("1", document.CompanyId);
                 Assert.Equal("Test Company", document.CompanyName);
             }
@@ -159,7 +149,7 @@ namespace Foundatio.Repositories.Marten.Tests {
             Assert.Equal(employees.First(e => e.CompanyId == "2"), results.Documents.First());
 
             var company2Employees = results.Documents.ToList();
-            long company2EmployeesVersion = company2Employees.First().Version;
+            Guid company2EmployeesVersion = company2Employees.First().GetVersionAsGuidOrDefault();
             Assert.Equal(1, await _employeeRepository.IncrementYearsEmployeedAsync(company2Employees.Select(e => e.Id).ToArray()));
 
             results = await _employeeRepository.GetAllByCompanyAsync("2");
@@ -324,7 +314,7 @@ namespace Foundatio.Repositories.Marten.Tests {
             var results = await _employeeRepository.GetAllByCompanyAsync("1", o => o.PageLimit(NUMBER_OF_EMPLOYEES));
             Assert.Equal(NUMBER_OF_EMPLOYEES, results.Documents.Count);
             foreach (var document in results.Documents) {
-                Assert.Equal(2, document.Version);
+                Assert.Equal(Guid.Empty, document.Version);
                 Assert.Equal("1", document.CompanyId);
                 Assert.Equal("Test Company", document.CompanyName);
             }
@@ -340,7 +330,7 @@ namespace Foundatio.Repositories.Marten.Tests {
             var results = await _employeeRepository.GetAllByCompanyAsync("1", o => o.PageLimit(NUMBER_OF_EMPLOYEES));
             Assert.Equal(NUMBER_OF_EMPLOYEES, results.Documents.Count);
             foreach (var document in results.Documents) {
-                Assert.Equal(2, document.Version);
+                Assert.Equal(Guid.Empty, document.Version);
                 Assert.Equal("1", document.CompanyId);
                 Assert.Equal("Test Company", document.CompanyName);
             }

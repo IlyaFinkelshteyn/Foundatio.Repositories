@@ -39,7 +39,8 @@ namespace Foundatio.Repositories.Marten.Tests {
                 st.Logger(new MartenTestLogger(Log));
                 st.Linq.MethodCallParsers.Add(new MatchesWhereFragmentParser());
                 st.AutoCreateSchemaObjects = AutoCreate.All;
-                st.Schema.For<Employee>().SoftDeleted();
+                st.Schema.For<Employee>().IndexLastModified().Duplicate(e => e.IsDeleted);
+                st.Schema.For<Identity>();
             });
 
             return store;

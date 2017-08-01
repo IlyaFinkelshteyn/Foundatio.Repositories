@@ -75,7 +75,7 @@ namespace Foundatio.Repositories.Marten {
                 return await FindAsAsync<TResult>(query, options).AnyContext();
             }
 
-            string cacheSuffix = options?.HasPageLimit() == true ? String.Concat(options.GetPage().ToString(), ":", options.GetLimit().ToString()) : null;
+            string cacheSuffix = options?.HasPageLimit() == true ? String.Concat(options.GetPage().ToString(), ":", options.GetPageLimit().ToString()) : null;
 
             FindResults<TResult> result;
             if (allowCaching) {
@@ -92,7 +92,7 @@ namespace Foundatio.Repositories.Marten {
 
                 if (options.HasPageLimit()) {
                     result = ToFindResults(response.Select(r => _mapper.Map<T, TResult>(r)).ToList(), stats.TotalResults);
-                    result.HasMore = response.Count > options.GetLimit();
+                    result.HasMore = stats.TotalResults > options.GetSkip() + options.GetPageLimit();
                     ((IGetNextPage<TResult>) result).GetNextPageFunc = GetNextPageFunc;
                 } else {
                     result = ToFindResults(response.Select(r => _mapper.Map<T, TResult>(r)).ToList(), stats.TotalResults);
@@ -184,7 +184,7 @@ namespace Foundatio.Repositories.Marten {
                 return hits.AsReadOnly();
 
             using (var session = _store.QuerySession()) {
-                var docs = await session.LoadManyAsync<T>(ids.Select(i => i.Value).ToArray()).AnyContext();
+                var docs = await session.LoadManyAsync<T>(itemsToFind.Select(i => i.Value).ToArray()).AnyContext();
                 hits.AddRange(docs);
             }
 

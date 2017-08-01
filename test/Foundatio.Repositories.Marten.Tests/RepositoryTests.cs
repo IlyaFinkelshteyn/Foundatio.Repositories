@@ -125,7 +125,7 @@ namespace Foundatio.Repositories.Marten.Tests {
             };
 
             await Assert.ThrowsAsync<DuplicateDocumentException>(async () => await _identityRepository.AddAsync(identities, o => o.ImmediateConsistency()));
-            Assert.Equal(2, await _identityRepository.CountAsync());
+            Assert.Equal(1, await _identityRepository.CountAsync());
         }
 
         [Fact]
@@ -330,7 +330,7 @@ namespace Foundatio.Repositories.Marten.Tests {
             employee = await _employeeRepository.GetByIdAsync(employee.Id);
             Assert.Equal(EmployeeGenerator.Default.Age, employee.Age);
             Assert.Equal("Patched", employee.Name);
-            Assert.Equal(2, employee.Version);
+            Assert.NotEqual(Guid.Empty, employee.Version);
         }
 
         [Fact]
@@ -341,7 +341,7 @@ namespace Foundatio.Repositories.Marten.Tests {
             employee = await _employeeRepository.GetByIdAsync(employee.Id);
             Assert.Equal(EmployeeGenerator.Default.Age, employee.Age);
             Assert.Equal("Patched", employee.Name);
-            Assert.Equal(2, employee.Version);
+            Assert.NotEqual(Guid.Empty, employee.Version);
         }
 
         [Fact]
@@ -352,7 +352,7 @@ namespace Foundatio.Repositories.Marten.Tests {
             employee = await _employeeRepository.GetByIdAsync(employee.Id);
             Assert.Equal(EmployeeGenerator.Default.Age, employee.Age);
             Assert.Equal("Patched", employee.Name);
-            Assert.Equal(2, employee.Version);
+            Assert.NotEqual(Guid.Empty, employee.Version);
         }
 
         [Fact]

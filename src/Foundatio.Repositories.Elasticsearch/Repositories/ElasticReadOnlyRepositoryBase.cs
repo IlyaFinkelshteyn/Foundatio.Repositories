@@ -69,7 +69,7 @@ namespace Foundatio.Repositories.Elasticsearch {
 
                     var results = scrollResponse.ToFindResults();
                     results.Page = previousResults.Page + 1;
-                    results.HasMore = scrollResponse.Hits.Count() >= options.GetLimit();
+                    results.HasMore = scrollResponse.Hits.Count() >= options.GetPageLimit();
                     return results;
                 }
 
@@ -81,7 +81,7 @@ namespace Foundatio.Repositories.Elasticsearch {
                 return await FindAsAsync<TResult>(query, options).AnyContext();
             };
 
-            string cacheSuffix = options?.HasPageLimit() == true ? String.Concat(options.GetPage().ToString(), ":", options.GetLimit().ToString()) : null;
+            string cacheSuffix = options?.HasPageLimit() == true ? String.Concat(options.GetPage().ToString(), ":", options.GetPageLimit().ToString()) : null;
 
             FindResults<TResult> result;
             if (allowCaching) {
@@ -117,11 +117,11 @@ namespace Foundatio.Repositories.Elasticsearch {
             if (useSnapshotPaging) {
                 result = response.ToFindResults();
                 // TODO: Is there a better way to figure out if you are done scrolling?
-                result.HasMore = response.Hits.Count() >= options.GetLimit();
+                result.HasMore = response.Hits.Count() >= options.GetPageLimit();
                 ((IGetNextPage<TResult>)result).GetNextPageFunc = getNextPageFunc;
             } else if (options.HasPageLimit() == true) {
-                result = response.ToFindResults(options.GetLimit());
-                result.HasMore = response.Hits.Count() > options.GetLimit();
+                result = response.ToFindResults(options.GetPageLimit());
+                result.HasMore = response.Hits.Count() > options.GetPageLimit();
                 ((IGetNextPage<TResult>)result).GetNextPageFunc = getNextPageFunc;
             } else {
                 result = response.ToFindResults();
