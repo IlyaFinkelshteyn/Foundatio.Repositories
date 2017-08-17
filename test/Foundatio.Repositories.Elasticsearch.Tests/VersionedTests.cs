@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Foundatio.Repositories.Elasticsearch.Tests.Repositories.Models;
+using Foundatio.Repositories.Exceptions;
 using Foundatio.Repositories.Extensions;
 using Foundatio.Repositories.Models;
 using Foundatio.Repositories.Utility;
@@ -80,10 +81,10 @@ namespace Foundatio.Repositories.Elasticsearch.Tests {
             Assert.Equal(employeeCopy.GetVersionAsLongOrDefault() + 1, employee.Version);
 
             long version = employeeCopy.GetVersionAsLongOrDefault();
-            await Assert.ThrowsAsync<ApplicationException>(async () => await _employeeRepository.SaveAsync(employeeCopy));
+            await Assert.ThrowsAsync<ConcurrencyException>(async () => await _employeeRepository.SaveAsync(employeeCopy));
             Assert.Equal(version, employeeCopy.GetVersionAsLongOrDefault());
 
-            await Assert.ThrowsAsync<ApplicationException>(async () => await _employeeRepository.SaveAsync(employeeCopy));
+            await Assert.ThrowsAsync<ConcurrencyException>(async () => await _employeeRepository.SaveAsync(employeeCopy));
             Assert.Equal(version, employeeCopy.GetVersionAsLongOrDefault());
 
             Assert.Equal(employee, await _employeeRepository.GetByIdAsync(employee.Id));
@@ -98,7 +99,7 @@ namespace Foundatio.Repositories.Elasticsearch.Tests {
             Assert.Equal(1, employee.GetVersionAsLongOrDefault());
 
             employee.Version = 5;
-            await Assert.ThrowsAsync<ApplicationException>(async () => await _employeeRepository.SaveAsync(employee));
+            await Assert.ThrowsAsync<ConcurrencyException>(async () => await _employeeRepository.SaveAsync(employee));
         }
 
         [Fact]
@@ -120,12 +121,12 @@ namespace Foundatio.Repositories.Elasticsearch.Tests {
             Assert.Equal(2, employee1.GetVersionAsLongOrDefault());
             Assert.Equal(2, employee2.GetVersionAsLongOrDefault());
 
-            await Assert.ThrowsAsync<ApplicationException>(async () => await _employeeRepository.SaveAsync(new List<Employee> { employee1Version1Copy, employee2 }));
+            await Assert.ThrowsAsync<ConcurrencyException>(async () => await _employeeRepository.SaveAsync(new List<Employee> { employee1Version1Copy, employee2 }));
             Assert.Equal(1, employee1Version1Copy.GetVersionAsLongOrDefault());
             Assert.Equal(2, employee1.GetVersionAsLongOrDefault());
             Assert.Equal(3, employee2.GetVersionAsLongOrDefault());
 
-            await Assert.ThrowsAsync<ApplicationException>(async () => await _employeeRepository.SaveAsync(new List<Employee> { employee1Version1Copy, employee2 }));
+            await Assert.ThrowsAsync<ConcurrencyException>(async () => await _employeeRepository.SaveAsync(new List<Employee> { employee1Version1Copy, employee2 }));
             Assert.Equal(1, employee1Version1Copy.GetVersionAsLongOrDefault());
             Assert.Equal(2, employee1.GetVersionAsLongOrDefault());
             Assert.Equal(4, employee2.GetVersionAsLongOrDefault());
@@ -176,7 +177,7 @@ namespace Foundatio.Repositories.Elasticsearch.Tests {
             results = await _employeeRepository.GetAllByCompanyAsync("2");
             Assert.Equal(company2Employees.First().YearsEmployed + 1, results.Documents.First().YearsEmployed);
 
-            await Assert.ThrowsAsync<ApplicationException>(async () => await _employeeRepository.SaveAsync(company2Employees));
+            await Assert.ThrowsAsync<ConcurrencyException>(async () => await _employeeRepository.SaveAsync(company2Employees));
             Assert.Equal(company2EmployeesVersion, company2Employees.First().Version);
         }
 

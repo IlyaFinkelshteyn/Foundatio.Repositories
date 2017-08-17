@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net461</TargetFramework>
@@ -10,11 +10,12 @@
 
   <ItemGroup>
     <PackageReference Include="AutoMapper" Version="6.1.1" />
-    <PackageReference Include="Marten" Version="2.0.0-rc-51247" />
+    <PackageReference Include="Marten" Version="2.0.0" />
     <PackageReference Include="Newtonsoft.Json" Version="10.0.3" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\..\marten\src\Marten\Marten.csproj" />
     <ProjectReference Include="..\Foundatio.Repositories\Foundatio.Repositories.csproj" />
   </ItemGroup>
 

@@ -35,11 +35,12 @@ namespace Foundatio.Repositories.Marten.Tests {
 
         private IDocumentStore GetDocumentStore() {
             var store = DocumentStore.For(st => {
+                st.UseDefaultSerialization(EnumStorage.AsString, Casing.CamelCase);
                 st.Connection("host=localhost;database=marten;username=postgres;password=banana");
                 st.Logger(new MartenTestLogger(Log));
                 st.Linq.MethodCallParsers.Add(new MatchesWhereFragmentParser());
                 st.AutoCreateSchemaObjects = AutoCreate.All;
-                st.Schema.For<Employee>().IndexLastModified().Duplicate(e => e.IsDeleted);
+                st.Schema.For<Employee>().IndexLastModified().Duplicate(e => e.IsDeleted).UseOptimisticConcurrency(true);
                 st.Schema.For<Identity>();
             });
 

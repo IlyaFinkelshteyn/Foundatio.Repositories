@@ -1,6 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
+using System.Reflection;
+using System.Reflection.Emit;
 using System.Threading.Tasks;
 using AutoMapper;
 using AutoMapper.QueryableExtensions;
@@ -16,6 +19,8 @@ using Foundatio.Utility;
 using Marten;
 using Marten.Linq;
 using Marten.Schema;
+using Marten.Services;
+using Newtonsoft.Json.Linq;
 
 namespace Foundatio.Repositories.Marten {
     public abstract class MartenReadOnlyRepositoryBase<T> : IAdvancedReadOnlyRepository<T> where T : class, new() {
@@ -77,7 +82,7 @@ namespace Foundatio.Repositories.Marten {
 
             string cacheSuffix = options?.HasPageLimit() == true ? String.Concat(options.GetPage().ToString(), ":", options.GetPageLimit().ToString()) : null;
 
-            FindResults<TResult> result;
+            FindResults<TResult> result = null;
             if (allowCaching) {
                 result = await GetCachedQueryResultAsync<FindResults<TResult>>(options, cacheSuffix: cacheSuffix).AnyContext();
                 if (result != null) {
@@ -88,14 +93,37 @@ namespace Foundatio.Repositories.Marten {
 
             using (var session = _store.QuerySession()) {
                 QueryStatistics stats;
-                var response = session.Query<T>(query, options).Stats(out stats).ToList();
+                if (typeof(TResult) == typeof(JObject) || typeof(TResult) == typeof(JToken)) {
+                    var response = session.Query<T>(query, options).Stats(out stats).AsJson().ToList();
 
-                if (options.HasPageLimit()) {
-                    result = ToFindResults(response.Select(r => _mapper.Map<T, TResult>(r)).ToList(), stats.TotalResults);
-                    result.HasMore = stats.TotalResults > options.GetSkip() + options.GetPageLimit();
-                    ((IGetNextPage<TResult>) result).GetNextPageFunc = GetNextPageFunc;
+                    if (options.HasPageLimit()) {
+                        result = ToFindResults(session, response.Select(r => JObject.Parse(r) as TResult).ToList(), stats.TotalResults);
+                        result.HasMore = stats.TotalResults > options.GetSkip() + options.GetPageLimit();
+                        ((IGetNextPage<TResult>)result).GetNextPageFunc = GetNextPageFunc;
+                    } else {
+                        result = ToFindResults(session, response.Select(r => JObject.Parse(r) as TResult).ToList(), stats.TotalResults);
+                    }
+                } else if (typeof(TResult) == typeof(string)) {
+                    var response = session.Query<T>(query, options).Stats(out stats).AsJson().ToList();
+
+                    if (options.HasPageLimit()) {
+                        result = ToFindResults(session, response.Select(r => r as TResult).ToList(), stats.TotalResults);
+                        result.HasMore = stats.TotalResults > options.GetSkip() + options.GetPageLimit();
+                        ((IGetNextPage<TResult>)result).GetNextPageFunc = GetNextPageFunc;
+                    } else {
+                        result = ToFindResults(session, response.Select(r => r as TResult).ToList(), stats.TotalResults);
+                    }
                 } else {
-                    result = ToFindResults(response.Select(r => _mapper.Map<T, TResult>(r)).ToList(), stats.TotalResults);
+                    var response = session.Query<T>(query, options).Stats(out stats).ToList();
+
+                    if (options.HasPageLimit()) {
+                        result = ToFindResults(session, response.Select(r => _mapper.Map<T, TResult>(r)).ToList(), stats.TotalResults);
+                        result.HasMore = stats.TotalResults > options.GetSkip() + options.GetPageLimit();
+                        ((IGetNextPage<TResult>)result).GetNextPageFunc = GetNextPageFunc;
+                    }
+                    else {
+                        result = ToFindResults(session, response.Select(r => _mapper.Map<T, TResult>(r)).ToList(), stats.TotalResults);
+                    }
                 }
 
                 result.Page = options.GetPage();
@@ -112,12 +140,15 @@ namespace Foundatio.Repositories.Marten {
             }
         }
 
-        protected FindResults<TResult> ToFindResults<TResult>(IReadOnlyList<TResult> results, long total) where TResult : class {
-            return new FindResults<TResult>(results.Select(ToFindHit), total);
+        protected FindResults<TResult> ToFindResults<TResult>(IQuerySession session, IReadOnlyList<TResult> results, long total) where TResult : class {
+            return new FindResults<TResult>(results.Select(d => ToFindHit(session, d)), total);
         }
 
-        protected FindHit<TResult> ToFindHit<TResult>(TResult doc) where TResult : class {
-            return new FindHit<TResult>(null, doc, 0);
+        protected FindHit<TResult> ToFindHit<TResult>(IQuerySession session, TResult doc) where TResult : class {
+            var identityDoc = doc as IIdentity;
+            string identity = identityDoc?.Id;
+
+            return new FindHit<TResult>(identity, doc, 0, GetVersion(session, identityDoc));
         }
 
         public async Task<FindHit<T>> FindOneAsync(IRepositoryQuery query, ICommandOptions options = null) {
@@ -134,7 +165,7 @@ namespace Foundatio.Repositories.Marten {
             using (var session = _store.QuerySession()) {
                 var response = await session.Query<T>(query, options).FirstOrDefaultAsync().AnyContext(); ;
 
-                result = ToFindHit(response);
+                result = ToFindHit(session, response);
 
                 if (IsCacheEnabled)
                     await SetCachedQueryResultAsync(options, result).AnyContext();
@@ -156,8 +187,10 @@ namespace Foundatio.Repositories.Marten {
                 return hit;
             }
 
-            using (var session = _store.QuerySession())
+            using (var session = _store.QuerySession()) {
                 hit = await session.LoadAsync<T>(id.Value).AnyContext();
+                SetVersion(hit as IIdentity, session);
+            }
 
             if (hit != null && IsCacheEnabled && options.ShouldUseCache())
                 await Cache.SetAsync(id, hit, options.GetExpiresIn()).AnyContext();
@@ -185,6 +218,7 @@ namespace Foundatio.Repositories.Marten {
 
             using (var session = _store.QuerySession()) {
                 var docs = await session.LoadManyAsync<T>(itemsToFind.Select(i => i.Value).ToArray()).AnyContext();
+                SetVersions(docs, session);
                 hits.AddRange(docs);
             }
 
@@ -347,6 +381,52 @@ namespace Foundatio.Repositories.Marten {
             await Cache.SetAsync(cacheKey, result, options.GetExpiresIn()).AnyContext();
             _logger.Trace(() => $"Set cache: type={EntityTypeName} key={cacheKey}");
         }
+
+        #region SetVersions
+
+        protected void SetVersion<TResult>(TResult doc, IQuerySession session) where TResult : IIdentity {
+            if (!HasVersion || doc == null)
+                return;
+
+            var version = GetVersion(session, doc);
+            if (version.HasValue)
+                ((IVersioned)doc).Version = version.Value;
+        }
+
+        protected void SetVersions<TResult>(IReadOnlyCollection<TResult> documents, IQuerySession session) {
+            if (!HasVersion)
+                return;
+
+            foreach (var doc in documents.OfType<IIdentity>()) {
+                var version = GetVersion(session, doc);
+                if (version.HasValue)
+                    ((IVersioned)doc).Version = version.Value;
+            }
+        }
+
+        public static Guid? GetVersion(IQuerySession session, IIdentity document) {
+            if (document == null)
+                return null;
+
+            var map = GetIdentityMap(session);
+            return map.Versions.Version<T>(document.Id);
+        }
+
+        public static IIdentityMap GetIdentityMap(IQuerySession session) {
+            if (_getIdentityMapFunc == null)
+                _getIdentityMapFunc = CreateGetFieldDelegate<QuerySession, IIdentityMap>(typeof(QuerySession), "_identityMap");
+
+            return _getIdentityMapFunc(session as QuerySession);
+        }
+
+        private static Func<QuerySession, IIdentityMap> _getIdentityMapFunc;
+        private static Func<TSource, TReturn> CreateGetFieldDelegate<TSource, TReturn>(Type type, string fieldName) {
+            var instExp = Expression.Parameter(type);
+            var fieldExp = Expression.Field(instExp, fieldName);
+            return Expression.Lambda<Func<TSource, TReturn>>(fieldExp, instExp).Compile();
+        }
+
+        #endregion
 
         #region Events
 

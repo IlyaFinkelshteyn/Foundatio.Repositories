@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Foundatio.Logging;
 using Foundatio.Repositories.Marten.Tests.Repositories.Models;
 using Foundatio.Repositories.Exceptions;
+using Foundatio.Repositories.Extensions;
 using Foundatio.Repositories.JsonPatch;
 using Foundatio.Repositories.Models;
 using Foundatio.Repositories.Utility;
@@ -462,7 +463,9 @@ namespace Foundatio.Repositories.Marten.Tests {
         public async Task RemoveAllWithBatchingAsync() {
             const int COUNT = 1000;
             Log.SetLogLevel<IdentityRepository>(LogLevel.Information);
-            await _identityRepository.AddAsync(IdentityGenerator.GenerateIdentities(COUNT), o => o.ImmediateConsistency());
+            var identities = IdentityGenerator.GenerateIdentities(COUNT);
+            identities.EnsureIds();
+            _store.BulkInsertDocuments(identities);
             Log.SetLogLevel<IdentityRepository>(LogLevel.Trace);
 
             var disposables = new List<IDisposable>(2);

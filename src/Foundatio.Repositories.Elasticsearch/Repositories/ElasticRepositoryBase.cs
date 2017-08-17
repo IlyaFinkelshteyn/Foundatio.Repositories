@@ -777,6 +777,9 @@ namespace Foundatio.Repositories.Elasticsearch {
                     if (isCreateOperation && response.ServerError?.Status == 409)
                         throw new DuplicateDocumentException(message, response.OriginalException);
 
+                    if (!isCreateOperation && response.ServerError?.Status == 409)
+                        throw new ConcurrencyException(message, response.OriginalException);
+
                     throw new ApplicationException(message, response.OriginalException);
                 }
 
@@ -844,6 +847,9 @@ namespace Foundatio.Repositories.Elasticsearch {
                     _logger.Error().Exception(response.OriginalException).Message(message).Property("request", response.GetRequest()).Write();
                     if (isCreateOperation && allErrors.Any(e => e.Status == 409))
                         throw new DuplicateDocumentException(message, response.OriginalException);
+
+                    if (!isCreateOperation && allErrors.Any(e => e.Status == 409))
+                        throw new ConcurrencyException(message, response.OriginalException);
 
                     throw new ApplicationException(message, response.OriginalException);
                 }
