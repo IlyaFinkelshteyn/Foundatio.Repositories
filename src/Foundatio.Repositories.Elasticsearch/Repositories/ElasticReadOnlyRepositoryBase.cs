@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Threading.Tasks;
 using Foundatio.Caching;
 using Foundatio.Parsers.ElasticQueries.Extensions;
@@ -82,6 +83,41 @@ namespace Foundatio.Repositories.Elasticsearch {
                     return results;
                 }
 
+                if (options.ShouldUseSearchAfterPaging()) {
+                    var lastDocument = previousResults.Documents.LastOrDefault();
+                    if (lastDocument != null) {
+                        var searchAfterValues = new List<object>();
+                        var sorts = query.GetSorts();
+                        if (sorts.Count > 0) {
+                            foreach (var sort in query.GetSorts()) {
+                                if (sort.SortKey.Property?.DeclaringType == lastDocument.GetType()) {
+                                    searchAfterValues.Add(sort.SortKey.Property.GetValue(lastDocument));
+                                } else if (typeof(TResult) == typeof(T) && sort.SortKey.Expression is Expression<Func<T, object>> valueGetterExpression) {
+                                    var valueGetter = valueGetterExpression.Compile();
+                                    var typedLastDocument = lastDocument as T;
+                                    if (typedLastDocument != null) {
+                                        var value = valueGetter.Invoke(typedLastDocument);
+                                        searchAfterValues.Add(value);
+                                    }
+                                } else if (sort.SortKey.Name != null) {
+                                    var propertyInfo = lastDocument.GetType().GetProperty(sort.SortKey.Name);
+                                    if (propertyInfo != null)
+                                        searchAfterValues.Add(propertyInfo.GetValue(lastDocument));
+                                } else {
+                                    // TODO: going to to need to take the Expression and pull the string name from it
+                                }
+                            }
+                        } else if (lastDocument is IIdentity lastDocumentId) {
+                            searchAfterValues.Add(lastDocumentId.Id);
+                        }
+
+                        if (searchAfterValues.Count > 0)
+                            options.SearchAfter(searchAfterValues.ToArray());
+                        else
+                            throw new ArgumentException("Unable to automatically calculate values for SearchAfterPaging.");
+                    }
+                }
+
                 if (options == null)
                     return new FindResults<TResult>();
 
@@ -105,6 +141,9 @@ namespace Foundatio.Repositories.Elasticsearch {
                 var searchDescriptor = await CreateSearchDescriptorAsync(query, options).AnyContext();
                 if (useSnapshotPaging)
                     searchDescriptor.Scroll(options.GetSnapshotLifetime());
+
+                if (query.ShouldOnlyHaveIds())
+                    searchDescriptor.Source(false);
 
                 response = await _client.SearchAsync<TResult>(searchDescriptor).AnyContext();
             } else {
@@ -189,7 +228,7 @@ namespace Foundatio.Repositories.Elasticsearch {
                 .MergeFrom(systemFilter?.GetQuery())
                 .FilterExpression(filter)
                 .SearchExpression(criteria)
-                .AggregationsExression(aggregations)
+                .AggregationsExpression(aggregations)
                 .SortExpression(sort);
 
             return FindAsync(search, options);
@@ -271,7 +310,7 @@ namespace Foundatio.Repositories.Elasticsearch {
                     continue;
 
                 hits.Add(((IMultiGetHit<T>)doc).ToFindHit().Document);
-                itemsToFind.Remove(doc.Id);
+                itemsToFind.Remove(new Id(doc.Id, doc.Routing));
             }
 
             // fallback to doing a find
@@ -406,7 +445,7 @@ namespace Foundatio.Repositories.Elasticsearch {
             var search = NewQuery()
                 .MergeFrom(systemFilter?.GetQuery())
                 .FilterExpression(filter)
-                .AggregationsExression(aggregations);
+                .AggregationsExpression(aggregations);
 
             return CountAsync(search, options);
         }

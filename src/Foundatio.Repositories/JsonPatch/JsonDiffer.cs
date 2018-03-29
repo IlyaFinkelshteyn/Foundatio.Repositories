@@ -13,13 +13,11 @@ namespace Foundatio.Repositories.JsonPatch {
 
         private static Operation Build(string op, string path, string key, JToken value) {
             if (String.IsNullOrEmpty(key))
-                return
-                    Operation.Parse("{ 'op' : '" + op + "' , path: '" + path + "', value: " +
+                return Operation.Parse("{ 'op' : '" + op + "' , path: '" + path + "', value: " +
                                     (value == null ? "null" : value.ToString(Formatting.None)) + "}");
-            else
-                return
-                    Operation.Parse("{ op : '" + op + "' , path : '" + Extend(path, key) + "' , value : " +
-                                    (value == null ? "null" : value.ToString(Formatting.None)) + "}");
+
+            return Operation.Parse("{ op : '" + op + "' , path : '" + Extend(path, key) + "' , value : " +
+                                (value == null ? "null" : value.ToString(Formatting.None)) + "}");
         }
 
         internal static Operation Add(string path, string key, JToken value) {
@@ -54,9 +52,9 @@ namespace Foundatio.Repositories.JsonPatch {
                         prev = operation;
                     }
                 }
-                if (prev != null) {
+
+                if (prev != null)
                     yield return prev;
-                }
             } else if (left.Type == JTokenType.Object) {
                 var lprops = ((IDictionary<string, JToken>)left).OrderBy(p => p.Key);
                 var rprops = ((IDictionary<string, JToken>)right).OrderBy(p => p.Key);

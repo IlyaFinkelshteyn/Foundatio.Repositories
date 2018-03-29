@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
-using Exceptionless.DateTimeExtensions;
 using Foundatio.Parsers.ElasticQueries.Extensions;
 using Foundatio.Repositories.Elasticsearch.Jobs;
 using Foundatio.Repositories.Extensions;
@@ -109,26 +108,27 @@ namespace Foundatio.Repositories.Elasticsearch.Configuration {
         }
 
         private string GetReindexScripts(int currentVersion) {
-            var scriptsToRun = ReindexScripts.Where(s => s.Version > currentVersion && Version >= s.Version).OrderBy(s => s.Version).ToList();
+            var scripts = ReindexScripts.Where(s => s.Version > currentVersion && Version >= s.Version).OrderBy(s => s.Version).ToList();
+            if (scripts.Count == 0)
+                return null;
 
-            if (!scriptsToRun.Any()) return null;
+            if (scripts.Count == 1)
+                return WrapScriptInTypeCheck(scripts[0].Script, scripts[0].Type);
 
-            if (scriptsToRun.Count() == 1)
-                return WrapScriptInTypeCheck(scriptsToRun.First().Script, scriptsToRun.First().Type);
-            else {
-                string fullScriptWithFunctions = String.Empty;
-                string functionCalls = String.Empty;
-                for (int i = 0; i < scriptsToRun.Count(); i++) {
-                    fullScriptWithFunctions += $"void f{i:000}(def ctx) {{ {WrapScriptInTypeCheck(scriptsToRun[i].Script, scriptsToRun[i].Type)} }}\r\n";
-                    functionCalls += $"f{i:000}(ctx); ";
-                }
-                return fullScriptWithFunctions + functionCalls;
+            string fullScriptWithFunctions = String.Empty;
+            string functionCalls = String.Empty;
+            for (int i = 0; i < scripts.Count; i++) {
+                var script = scripts[i];
+                fullScriptWithFunctions += $"void f{i:000}(def ctx) {{ {WrapScriptInTypeCheck(script.Script, script.Type)} }}\r\n";
+                functionCalls += $"f{i:000}(ctx); ";
             }
 
+            return fullScriptWithFunctions + functionCalls;
         }
 
         private string WrapScriptInTypeCheck(string script, string type) {
-            if (String.IsNullOrWhiteSpace(type)) return script;
+            if (String.IsNullOrWhiteSpace(type))
+                return script;
 
             return $"if (ctx._type == '{type}') {{ {script} }}";
         }
