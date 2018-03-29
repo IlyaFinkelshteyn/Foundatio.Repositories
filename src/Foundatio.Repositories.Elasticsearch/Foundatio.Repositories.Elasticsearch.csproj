@@ -10,7 +10,7 @@
   <ItemGroup>
     <PackageReference Include="Foundatio.Jobs.Commands" Version="7.0.1693-pre" />
     <PackageReference Include="Foundatio.Parsers.ElasticQueries" Version="5.6.377-pre" />
-    <PackageReference Include="NEST.JsonNetSerializer" Version="6.0.0-rc1" />
+    <PackageReference Include="NEST.JsonNetSerializer" Version="6.0.2" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Foundatio.Repositories\Foundatio.Repositories.csproj" />
