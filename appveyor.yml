@@ -10,6 +10,15 @@ environment:
   JAVA_HOME: C:\Progra~1\Java\jdk1.8.0
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
   DOTNET_CLI_TELEMETRY_OPTOUT: 1
+  matrix:
+    - MY_TRY: 1
+    - MY_TRY: 2
+    - MY_TRY: 3
+    - MY_TRY: 4
+    - MY_TRY: 5
+    - MY_TRY: 6
+    - MY_TRY: 7
+    - MY_TRY: 8
 
 init:
   - git config --global core.autocrlf input
