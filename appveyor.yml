@@ -1,6 +1,6 @@
 ﻿version: 5.6.{build}
 os: Previous Visual Studio 2017
-clone_depth: 2
+#clone_depth: 2
 configuration: Release
 
 pull_requests:
